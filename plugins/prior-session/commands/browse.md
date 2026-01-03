@@ -1,11 +1,6 @@
 ---
 description: Browse and search cleared Claude Code sessions
-approved_tools:
-  - "Bash(echo*)"
-  - "Bash(pwd)"
-  - "Glob(**/*.cleared.json)"
-  - "Read(~/.claude/**)"
-  - "Read(/Users/**/.claude/**)"
+allowed-tools: Bash(echo:*), Bash(pwd), Glob, Read
 ---
 
 # Prior Sessions Command
