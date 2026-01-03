@@ -12,26 +12,6 @@ When you run `/clear` in Claude Code, this plugin:
 
 Later, use the `/prior-sessions` command to browse and search your cleared sessions.
 
-## Installation
-
-### Option 1: Development Mode (Quick Testing)
-
-Load the plugin directly for testing:
-
-```bash
-claude --plugin-dir /path/to/claude-kit
-```
-
-### Option 2: Install as Plugin
-
-```bash
-# Install globally (available in all projects)
-claude plugin install /path/to/claude-kit --scope user
-
-# Or install for a specific project
-claude plugin install /path/to/claude-kit --scope project
-```
-
 ## Usage
 
 ### Automatic Session Capture

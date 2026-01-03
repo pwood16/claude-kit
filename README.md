@@ -11,7 +11,7 @@ Automatically capture and browse summaries of your cleared sessions. When you ru
 - Generates concise title and summary via LLM
 - Browse with `/claude-kit:prior-sessions`
 
-See [docs/session-tracker.md](docs/session-tracker.md) for installation and usage.
+See [docs/session-tracker.md](docs/session-tracker.md) for details.
 
 ### [Statusline](scripts/README.md)
 Enhanced statusline with comprehensive git status indicators, token tracking, and color-coded status.
@@ -23,12 +23,31 @@ See [scripts/README.md](scripts/README.md) for installation and configuration de
 ## Installation
 
 ```bash
-# Install as a plugin (globally)
+# Install globally (available in all projects)
 claude plugin install /path/to/claude-kit --scope user
 
-# Or for development/testing
+# Or install for a specific project only
+claude plugin install /path/to/claude-kit --scope project
+```
+
+## Development
+
+To test the plugin without installing:
+
+```bash
 claude --plugin-dir /path/to/claude-kit
 ```
+
+### Test Fixtures
+
+The `test/fixtures/` directory contains sample SessionEnd hook data for testing the session tracker without running `/clear`:
+
+```bash
+# Test the hook script with fixture data
+cat test/fixtures/sessionend-clear-normal.json | ./hooks-handlers/on-clear.sh
+```
+
+See [test/README.md](test/README.md) for details on capturing new fixtures.
 
 ## Resources
 
