@@ -4,19 +4,19 @@ Automatically capture and browse summaries of your cleared Claude Code sessions.
 
 ## What It Does
 
-When you run `/clear` in Claude Code, this plugin:
+When you run `/clear` or `/exit` in Claude Code, this plugin:
 
 1. **Captures session metadata** - session ID, timestamps, git branch, files touched
 2. **Generates a summary** - uses an LLM to create a title and summary of what you accomplished
 3. **Saves it for later** - stores a `.cleared.json` file alongside your transcript
 
-Later, use the `/prior-session:browse` command to browse and search your cleared sessions.
+Later, use the `/prior-session:browse` command to browse and search your saved sessions.
 
 ## Usage
 
 ### Automatic Session Capture
 
-Just use `/clear` as normal. The plugin automatically:
+Just use `/clear` or `/exit` as normal. The plugin automatically:
 - Captures session metadata immediately (non-blocking)
 - Generates title and summary in the background
 - Saves everything to `~/.claude/projects/<project>/<session-id>.cleared.json`
@@ -42,9 +42,9 @@ You can also search:
 
 ## Components
 
-### Hook: `hooks-handlers/on-clear.sh`
+### Hook: `hooks-handlers/capture-session.sh`
 
-Triggered on SessionEnd when `/clear` is called. Extracts metadata and spawns the summarizer agent in the background.
+Triggered on SessionEnd when `/clear` or `/exit` is called. Extracts metadata and spawns the summarizer agent in the background.
 
 ### Agent: `agents/session-summarizer.md`
 

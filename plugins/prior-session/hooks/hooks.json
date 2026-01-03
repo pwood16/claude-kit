@@ -1,12 +1,12 @@
 {
-  "description": "Track cleared sessions for easy reference",
+  "description": "Capture session summaries on clear or exit",
   "hooks": {
     "SessionEnd": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_PLUGIN_ROOT}/hooks-handlers/on-clear.sh"
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks-handlers/capture-session.sh"
           }
         ]
       }

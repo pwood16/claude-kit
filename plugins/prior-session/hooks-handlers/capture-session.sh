@@ -8,8 +8,8 @@ transcript_path=$(echo "$input" | jq -r '.transcript_path')
 cwd=$(echo "$input" | jq -r '.cwd')
 reason=$(echo "$input" | jq -r '.reason')
 
-# Only process if this was a /clear (not a normal exit)
-[ "$reason" != "clear" ] && exit 0
+# Only process if this was a /clear or /exit
+[ "$reason" != "clear" ] && [ "$reason" != "exit" ] && exit 0
 
 # Exit if transcript doesn't exist
 [ ! -f "$transcript_path" ] && exit 0
