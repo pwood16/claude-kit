@@ -1,0 +1,15 @@
+{
+  "description": "Track cleared sessions for easy reference",
+  "hooks": {
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks-handlers/on-clear.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -185,7 +185,7 @@ reason=$(echo "$input" | jq -r '.reason')
 [ "$reason" != "clear" ] && exit 0
 
 # Exit if transcript doesn't exist
-[ ! -f "$transcript_path" ] || exit 0
+[ ! -f "$transcript_path" ] && exit 0
 
 # Extract basic metadata from JSONL (fast operations)
 first_message=$(jq -s '[.[] | select(.type == "user")][0].message.content // ""' "$transcript_path")
@@ -199,13 +199,13 @@ git_repo=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" || basename "
 started_at=$(jq -s '.[0].timestamp // ""' "$transcript_path")
 cleared_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
-# Invoke session-summarizer agent to get title + summary
-# Agent reads the transcript and returns structured JSON
-summary_json=$(claude --print \
+# Read transcript and pipe to session-summarizer agent
+# Agent receives content via stdin and returns structured JSON
+summary_json=$(cat "$transcript_path" | claude --print \
   --agent session-summarizer \
   --output-format json \
   --json-schema '{"type":"object","properties":{"title":{"type":"string"},"summary":{"type":"string"}},"required":["title","summary"]}' \
-  "Summarize the session transcript at: $transcript_path" 2>/dev/null || echo '{"title":"","summary":""}')
+  "Summarize this Claude Code session transcript:" 2>/dev/null || echo '{"title":"","summary":""}')
 
 title=$(echo "$summary_json" | jq -r '.title // ""')
 summary=$(echo "$summary_json" | jq -r '.summary // ""')
@@ -271,25 +271,23 @@ Agent for generating concise summaries of cleared sessions.
 name: session-summarizer
 description: Generates title and summary for cleared Claude Code sessions
 model: haiku
-tools: Read, Grep
 ---
 
 You are a session summarizer for Claude Code. Your task is to analyze conversation transcripts and generate concise summaries.
 
 ## Your Task
 
-When given a transcript path, you will:
+You will receive a JSONL transcript (one JSON object per line). Analyze the conversation and generate:
 
-1. **Read the transcript** using the Read tool
-2. **Analyze the conversation**:
-   - What was the user trying to accomplish?
-   - What did you help them build, fix, or understand?
-   - What files were modified?
-   - What was the final state when the session was cleared?
+1. **title** (5-8 words): A scannable label for quick identification
+2. **summary** (2-3 sentences): Key accomplishments and outcomes
 
-3. **Generate structured output** with TWO fields:
-   - **title** (5-8 words): A scannable label for quick identification
-   - **summary** (2-3 sentences): Key accomplishments and outcomes
+## Analysis Focus
+
+- What was the user trying to accomplish?
+- What was built, fixed, or explained?
+- What files were modified?
+- What was the final state when the session was cleared?
 
 ## Output Format
 
@@ -309,10 +307,6 @@ Always output valid JSON in this exact format:
 - **Be specific**: Mention concrete outcomes (files created, bugs fixed, features added)
 - **Avoid fluff**: No phrases like "successfully completed" or "helped the user"
 
-## Example Input
-
-User asks: "Summarize the session transcript at: /Users/phil/.claude/projects/.../636bbf12.jsonl"
-
 ## Example Output
 
 ```json
@@ -325,16 +319,17 @@ User asks: "Summarize the session transcript at: /Users/phil/.claude/projects/..
 
 **How It's Invoked** (from hook):
 ```bash
-claude --print \
+# Hook script reads transcript and pipes to agent
+cat "$transcript_path" | claude --print \
   --agent session-summarizer \
   --output-format json \
   --json-schema '{"type":"object","properties":{"title":{"type":"string"},"summary":{"type":"string"}},"required":["title","summary"]}' \
-  "Summarize the session transcript at: $transcript_path"
+  "Summarize this Claude Code session transcript:"
 ```
 
 **Configuration Benefits:**
 - Uses **haiku** model for speed and cost efficiency
-- Has access to **Read** and **Grep** tools only (no Write/Edit needed)
+- No tools required (receives transcript via stdin from hook script)
 - Agent prompt can be iterated independently of hook script
 - Model can be changed in agent definition (haiku → sonnet if needed)
 
@@ -450,9 +445,12 @@ Store plugin config in `.claude/settings.json` (or plugin-specific config):
 1. ✅ **Hook type**: Confirmed - use SessionEnd hook (not UserPromptSubmit)
 2. ✅ **Agent invocation**: Use `claude --print --agent session-summarizer` from hook script
 3. ✅ **Hook input schema**: SessionEnd provides: session_id, transcript_path, cwd, reason, permission_mode
-4. ⬜ **Performance**: How fast is JSONL parsing for large sessions (1000+ messages)? May need optimization.
-5. ⬜ **Agent timeout**: Should we add a timeout to the agent invocation to prevent hook hanging?
-6. ⬜ **Error handling**: What happens if the agent fails? Should we write partial metadata anyway?
+4. ✅ **Plugin path variable**: `${CLAUDE_PLUGIN_ROOT}` is confirmed in [Hooks Reference](https://code.claude.com/docs/en/hooks)
+5. ✅ **CLI flags**: `--output-format json` and `--json-schema` are confirmed in [CLI Reference](https://code.claude.com/docs/en/cli-reference)
+6. ✅ **Transcript availability**: Transcript is finalized and available when SessionEnd fires
+7. ⬜ **Performance**: How fast is JSONL parsing for large sessions (1000+ messages)? May need optimization.
+8. ⬜ **Agent timeout**: Should we add a timeout to the agent invocation to prevent hook hanging?
+9. ⬜ **Error handling**: What happens if the agent fails? Should we write partial metadata anyway?
 
 ## Success Metrics
 
