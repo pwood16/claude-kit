@@ -1,42 +1,16 @@
 # Claude Kit
 
-Enhanced statusline for Claude Code with git status indicators.
+A collection of helpful utilities and enhancements for Claude Code.
 
-## Features
+## Scripts
 
-- **Model & context**: Current Claude model and context window
-- **Git status**: Repository, branch, and changes
-  - `+N` staged files
-  - `!N` modified files
-  - `?N` untracked files
-  - `↑N` unpushed commits
-- **Token usage**: Session token count
-- **Color-coded**: Red (unstaged changes), Yellow (staged/untracked/unpushed), Green (clean)
+### [Statusline](scripts/README.md)
+Enhanced statusline with comprehensive git status indicators, token tracking, and color-coded status.
 
-Example: `[Sonnet 4.5 (1M context)] claude-kit:main [?2] | 16,145 session tokens`
+Example: `[Sonnet 4.5 (1M context)] claude-kit:main [!1 ⚠] | 49,221 session tokens`
 
-## Installation
+See [scripts/README.md](scripts/README.md) for installation and configuration details.
 
-**Prerequisites**: `jq` (`brew install jq`)
+## Resources
 
-1. Copy the statusline script:
-   ```bash
-   cp scripts/statusline.sh ~/.claude/statusline.sh
-   chmod +x ~/.claude/statusline.sh
-   ```
-
-2. Update `~/.claude/settings.json`:
-   ```json
-   {
-     "statusLine": {
-       "type": "command",
-       "command": "~/.claude/statusline.sh"
-     }
-   }
-   ```
-
-3. Restart Claude Code
-
-## Configuration
-
-Edit the `CACHE_DURATION` variable in the script to adjust cache timing (default: 3 seconds).
+- [Claude Code Documentation](https://code.claude.com/docs)
