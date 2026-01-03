@@ -1,0 +1,10 @@
+{
+  "name": "claude-kit",
+  "description": "Productivity toolkit marketplace for Claude Code",
+  "plugins": [
+    {
+      "name": "prior-session",
+      "path": "./plugins/prior-session"
+    }
+  ]
+}
