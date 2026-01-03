@@ -13,6 +13,3 @@ Thumbs.db
 .cache/
 tmp/
 temp/
-
-# Work in progress
-SESSION_TRACKER.md
