@@ -1,10 +1,15 @@
 {
   "name": "claude-kit",
   "description": "Productivity toolkit marketplace for Claude Code",
+  "owner": {
+    "name": "Philip Wood",
+    "email": "pwood16@gmail.com"
+  },
   "plugins": [
     {
       "name": "prior-session",
-      "path": "./plugins/prior-session"
+      "source": "./plugins/prior-session",
+      "description": "Automatically capture and browse summaries of cleared sessions"
     }
   ]
 }
