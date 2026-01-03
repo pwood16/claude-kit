@@ -25,25 +25,9 @@ message_count=$(jq -s '[.[] | select(.type == "user")] | length' "$transcript_pa
 git_branch=$(git branch --show-current 2>/dev/null || echo "")
 git_repo=$(basename "$(git rev-parse --show-toplevel 2>/dev/null)" || basename "$cwd")
 
-# Calculate timestamps
-started_at=$(jq -s '.[0].timestamp // ""' "$transcript_path")
+# Calculate timestamps (get first user message timestamp, not file-history-snapshot)
+started_at=$(jq -s '[.[] | select(.type == "user") | select(.timestamp)][0].timestamp // ""' "$transcript_path")
 cleared_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-# Read transcript content (limit to reasonable size for agent context)
-# Limit to ~100KB to stay well under token limits
-transcript_content=$(head -c 100000 "$transcript_path")
-
-# Invoke session-summarizer agent to get title + summary
-# Pipe transcript content to agent via stdin
-agent_output=$(echo "$transcript_content" | claude --print \
-  --agent session-summarizer \
-  --output-format json \
-  --json-schema '{"type":"object","properties":{"title":{"type":"string"},"summary":{"type":"string"}},"required":["title","summary"]}' \
-  "Summarize this Claude Code session transcript:" 2>&1 || echo '{"structured_output":{"title":"","summary":""}}')
-
-# Extract from structured_output field (where --output-format json puts structured responses)
-title=$(echo "$agent_output" | jq -r '.structured_output.title // ""')
-summary=$(echo "$agent_output" | jq -r '.structured_output.summary // ""')
 
 # Extract files touched (Write and Edit tool uses)
 files_touched=$(jq -s '[
@@ -55,7 +39,8 @@ files_touched=$(jq -s '[
   .input.file_path
 ] | unique' "$transcript_path")
 
-# Write complete metadata file
+# Phase 1: Write metadata immediately with empty title/summary
+# This ensures we capture session data even if LLM call fails
 cleared_json_path="${transcript_path%.jsonl}.cleared.json"
 cat > "$cleared_json_path" <<EOF
 {
@@ -75,10 +60,31 @@ cat > "$cleared_json_path" <<EOF
   "content": {
     "first_message": $(printf '%s' "$first_message" | jq -Rs .),
     "files_touched": $files_touched,
-    "title": $(printf '%s' "$title" | jq -Rs .),
-    "summary": $(printf '%s' "$summary" | jq -Rs .)
+    "title": "",
+    "summary": ""
   }
 }
 EOF
+
+# Phase 2: Background the slow LLM call to fill in title/summary
+# This allows /clear to return immediately without blocking
+# Use nohup and redirect all output to prevent blocking
+nohup bash -c "
+  transcript_content=\$(head -c 100000 \"$transcript_path\")
+
+  agent_output=\$(echo \"\$transcript_content\" | claude --print \
+    --agent session-summarizer \
+    --output-format json \
+    --json-schema '{\"type\":\"object\",\"properties\":{\"title\":{\"type\":\"string\"},\"summary\":{\"type\":\"string\"}},\"required\":[\"title\",\"summary\"]}' \
+    'Summarize this Claude Code session transcript:' 2>/dev/null) || exit 0
+
+  title=\$(echo \"\$agent_output\" | jq -r '.structured_output.title // \"\"')
+  summary=\$(echo \"\$agent_output\" | jq -r '.structured_output.summary // \"\"')
+
+  tmp=\$(mktemp)
+  jq --arg t \"\$title\" --arg s \"\$summary\" \
+    '.content.title = \$t | .content.summary = \$s' \
+    \"$cleared_json_path\" > \"\$tmp\" && mv \"\$tmp\" \"$cleared_json_path\"
+" </dev/null >/dev/null 2>&1 &
 
 exit 0
