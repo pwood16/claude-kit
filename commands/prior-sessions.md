@@ -9,7 +9,8 @@ Show my prior cleared sessions from this project (or all projects if I ask).
 ## Your Task
 
 1. **Find cleared session files**:
-   - Search for `*.cleared.json` files in `~/.claude/projects/`
+   - Search for `*.cleared.json` files in the Claude projects directory
+   - Use `$CLAUDE_CONFIG_DIR/projects/` if CLAUDE_CONFIG_DIR is set, otherwise `~/.claude/projects/`
    - Default: current project only (check if current directory matches any project path)
    - If I ask for "all projects", search all subdirectories
 
