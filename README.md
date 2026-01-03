@@ -18,22 +18,21 @@ See [plugins/prior-session](plugins/prior-session) for details.
 ### Add the Marketplace
 
 ```bash
-# Add the claude-kit marketplace
-claude plugin marketplace add /path/to/claude-kit/.claude-plugin/marketplace.json
-
-# Or add from GitHub (once published)
-claude plugin marketplace add your-username/claude-kit
+# Add the claude-kit marketplace from GitHub
+claude plugin marketplace add pwood16/claude-kit
 ```
 
 ### Install Plugins
 
 ```bash
-# Install the prior-session plugin globally
+# Install the prior-session plugin globally (available in all projects)
 claude plugin install prior-session@claude-kit --scope user
 
 # Or install for a specific project only
 claude plugin install prior-session@claude-kit --scope project
 ```
+
+**Note**: This is a private repository. You'll need SSH access configured to install the marketplace.
 
 ## Development
 
