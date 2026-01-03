@@ -28,7 +28,7 @@ Just use `/clear` as normal. The plugin automatically:
 ```
 
 This displays your cleared sessions with:
-- Date and time
+- Date and time (oldest first, newest last)
 - Title (5-8 words)
 - Summary (2-3 sentences)
 - Files touched
@@ -37,6 +37,8 @@ You can also search:
 ```
 /prior-session:browse authentication bug
 ```
+
+**Note**: You must be in the project directory to see sessions for that project. The command shows sessions from the current project by default.
 
 ## Components
 
