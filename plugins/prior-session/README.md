@@ -10,7 +10,7 @@ When you run `/clear` in Claude Code, this plugin:
 2. **Generates a summary** - uses an LLM to create a title and summary of what you accomplished
 3. **Saves it for later** - stores a `.cleared.json` file alongside your transcript
 
-Later, use the `/prior-sessions` command to browse and search your cleared sessions.
+Later, use the `/prior-session:browse` command to browse and search your cleared sessions.
 
 ## Usage
 
@@ -24,7 +24,7 @@ Just use `/clear` as normal. The plugin automatically:
 ### Browse Prior Sessions
 
 ```
-/claude-kit:prior-sessions
+/prior-session:browse
 ```
 
 This displays your cleared sessions with:
@@ -35,7 +35,7 @@ This displays your cleared sessions with:
 
 You can also search:
 ```
-/claude-kit:prior-sessions authentication bug
+/prior-session:browse authentication bug
 ```
 
 ## Components
@@ -48,7 +48,7 @@ Triggered on SessionEnd when `/clear` is called. Extracts metadata and spawns th
 
 A Haiku-based agent that reads session transcripts and generates concise summaries.
 
-### Command: `commands/prior-sessions.md`
+### Command: `commands/browse.md`
 
 Slash command to browse and search cleared sessions.
 

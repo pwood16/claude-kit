@@ -1,53 +1,48 @@
 # Claude Kit
 
-A collection of helpful utilities and enhancements for Claude Code.
+A marketplace of productivity plugins for Claude Code.
 
-## Features
+## Plugins
 
-### [Prior Sessions](docs/prior-sessions.md)
+### [Prior Session](plugins/prior-session)
 Automatically capture and browse summaries of your cleared sessions. When you run `/clear`, this plugin saves a searchable summary of what you accomplished.
 
 - Captures session metadata and files touched
 - Generates concise title and summary via LLM
-- Browse with `/claude-kit:prior-sessions`
+- Browse with `/prior-session:browse`
 
-See [docs/prior-sessions.md](docs/prior-sessions.md) for details.
-
-### [Statusline](scripts/README.md)
-Enhanced statusline with comprehensive git status indicators, token tracking, and color-coded status.
-
-Example: `[Sonnet 4.5 (1M context)] claude-kit:main [!1 ⚠] | 49,221 session tokens`
-
-See [scripts/README.md](scripts/README.md) for installation and configuration details.
+See [plugins/prior-session](plugins/prior-session) for details.
 
 ## Installation
 
+### Add the Marketplace
+
 ```bash
-# Install globally (available in all projects)
-claude plugin install /path/to/claude-kit --scope user
+# Add the claude-kit marketplace
+claude plugin marketplace add /path/to/claude-kit/.claude-plugin/marketplace.json
+
+# Or add from GitHub (once published)
+claude plugin marketplace add your-username/claude-kit
+```
+
+### Install Plugins
+
+```bash
+# Install the prior-session plugin globally
+claude plugin install prior-session@claude-kit --scope user
 
 # Or install for a specific project only
-claude plugin install /path/to/claude-kit --scope project
+claude plugin install prior-session@claude-kit --scope project
 ```
 
 ## Development
 
-To test the plugin without installing:
+To test plugins without installing via the marketplace:
 
 ```bash
-claude --plugin-dir /path/to/claude-kit
+# Test a specific plugin
+claude --plugin-dir /path/to/claude-kit/plugins/prior-session
 ```
-
-### Test Fixtures
-
-The `test/fixtures/` directory contains sample SessionEnd hook data for testing the prior sessions hook without running `/clear`:
-
-```bash
-# Test the hook script with fixture data
-cat test/fixtures/sessionend-clear-normal.json | ./hooks-handlers/on-clear.sh
-```
-
-See [test/README.md](test/README.md) for details on capturing new fixtures.
 
 ## Resources
 
