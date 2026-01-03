@@ -1,4 +1,4 @@
-# Session Tracker
+# Prior Sessions
 
 Automatically capture and browse summaries of your cleared Claude Code sessions.
 

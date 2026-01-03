@@ -14,7 +14,7 @@ Edit `~/.claude/settings.json` and add:
     "SessionEnd": [{
       "hooks": [{
         "type": "command",
-        "command": "~/.claude/session-tracker-test/echo-hook.sh"
+        "command": "~/.claude/prior-sessions-test/echo-hook.sh"
       }]
     }]
   }
@@ -28,11 +28,11 @@ Edit `~/.claude/settings.json` and add:
    - Different projects/branches
 
 3. **Captured data** is saved to:
-   - `~/.claude/session-tracker-test/captured-*.json`
+   - `~/.claude/prior-sessions-test/captured-*.json`
 
 4. **Copy useful fixtures** to `test/fixtures/`:
    ```bash
-   cp ~/.claude/session-tracker-test/captured-20260102_183045.json \
+   cp ~/.claude/prior-sessions-test/captured-20260102_183045.json \
       test/fixtures/sessionend-clear-normal.json
    ```
 
