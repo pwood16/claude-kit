@@ -310,7 +310,7 @@ run_agent() {
   local output
   if output=$(timeout $AGENT_TIMEOUT cat "${input_files[@]}" | claude --print \
     --agent "$agent_name" \
-    --max-turns 15 \
+    --max-turns 50 \
     "$prompt" 2>&1); then
     echo "$output" > "$output_file"
     return 0
@@ -428,11 +428,11 @@ tools: Read, Grep, Glob
 ```bash
 claude --print \
   --agent gh:pr-architecture-reviewer \
-  --max-turns 15 \
+  --max-turns 50 \
   'Review this PR for architecture compliance:'
 ```
 
-**`--max-turns 15`**: Limits agentic exploration to prevent runaway tool usage.
+**`--max-turns 50`**: Limits agentic exploration to prevent runaway tool usage while giving agents enough room for thorough analysis.
 
 ### Agent Configurations
 
