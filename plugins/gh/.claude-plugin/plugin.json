@@ -1,0 +1,8 @@
+{
+  "name": "gh",
+  "description": "GitHub workflow commands for branch management and PR review",
+  "version": "1.0.0",
+  "author": {
+    "name": "Phil"
+  }
+}

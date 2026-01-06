@@ -10,6 +10,11 @@
       "name": "prior-session",
       "source": "./plugins/prior-session",
       "description": "Automatically capture and browse summaries of cleared sessions"
+    },
+    {
+      "name": "gh",
+      "source": "./plugins/gh",
+      "description": "GitHub workflow commands for branch management and PR review"
     }
   ]
 }
