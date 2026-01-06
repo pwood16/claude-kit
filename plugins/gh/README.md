@@ -28,6 +28,33 @@ Fetch, checkout, and load PR context for review.
 - Read PR information via GitHub CLI
 - **Cannot**: push, commit, merge, or modify PRs
 
+### `/gh:pr-draft`
+
+Smart commit, push, and create draft PR with AI-generated description.
+
+**Usage:**
+```bash
+/gh:pr-draft              # From any branch
+```
+
+**What it does:**
+1. Analyzes unstaged changes and unpushed commits
+2. Creates feature branch if on `main` (pattern: `feature/{description}`)
+3. Intelligently stages related files (prompts about unclear files)
+4. Commits with auto-generated message
+5. Pushes to remote
+6. Creates draft PR with AI-generated description including:
+   - Summary focusing on the "why"
+   - Testing instructions
+   - Mermaid diagrams when complexity warrants
+   - Succinct, professional tone
+
+**Permissions:**
+- Stage, commit, and push changes
+- Create branches
+- Create draft PRs
+- **Cannot**: merge, force push, or modify existing commits
+
 ## Installation
 
 Part of claude-kit marketplace:
