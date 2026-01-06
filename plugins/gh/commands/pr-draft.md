@@ -1,6 +1,6 @@
 ---
 description: Smart commit, push, and create draft PR with AI-generated description
-allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(git branch:*), Bash(git checkout:*), Bash(git log:*), Bash(git rev-parse:*), Bash(gh pr create:*), AskUserQuestion, Read, Glob
+allowed-tools: Bash(git status:*), Bash(git diff:*), Bash(git add:*), Bash(git commit:*), Bash(git push -u origin:*), Bash(git branch:*), Bash(git checkout:*), Bash(git log:*), Bash(git rev-parse:*), Bash(gh pr create:*), AskUserQuestion, Read, Glob
 ---
 
 # Create Draft PR
@@ -122,15 +122,22 @@ sequenceDiagram
 ]
 ```
 
+**Length requirements (enforce strictly):**
+- Summary: 2-3 sentences MAX, not paragraphs (aim for ~50 words)
+- Changes: 3-5 bullets max, one line each
+- Testing: 3-5 steps max, focus on core happy path
+- Technical Notes: OMIT unless critical (if included, 2-3 sentences max)
+- Total description: Aim for <250 words, never exceed 400
+- Mermaid diagrams: Rarely needed - only for truly complex multi-step flows (5-8 nodes max)
+
 **Guidelines for PR description:**
-- Be succinct - no fluff or unnecessary words
-- Limit emojis (max 0-2 total, only if genuinely helpful)
-- Focus on WHY over HOW
-- Mermaid diagrams: Only when they clarify complex flows
-  - Use `flowchart TD` for decision/logic flows
-  - Use `sequenceDiagram` for interaction flows
-  - Keep diagrams simple (5-10 nodes max)
+- Keep descriptions scannable - reviewers need to understand in 60 seconds
+- Every sentence must justify its existence - no fluff
+- Focus on WHAT changed and WHY, never HOW
 - Testing section should be actionable and specific
+- Skip Technical Notes unless absolutely necessary to understand the change
+- Limit emojis (max 0-2 total, only if genuinely helpful)
+- Mermaid diagrams: Use `flowchart TD` for decision flows, `sequenceDiagram` for interactions
 
 **Create PR:**
 - Run: `gh pr create --draft --title "<generated-title>" --body "<generated-description>"`
