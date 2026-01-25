@@ -150,20 +150,33 @@ plugins/gh/
 └─────────────────────────────────────────┘
 ```
 
-## Future: Git Worktree Support
+## Git Worktree Support (Implemented)
 
-**Not implementing now, but design ensures compatibility:**
+**The review command now uses git worktrees by default:**
 
-1. **Repo path passed explicitly** - orchestrator receives `$repo_path` arg, doesn't use `pwd`
-2. **`context.json` includes `repo_path`** - agents reference files via absolute paths
-3. **Session ID format**: `{repo-hash}-{pr-number}-{uuid}` - unique per worktree
-4. **No checkout required** - review works on any worktree pointing to the branch
+1. **Isolated checkout** - Creates worktree at `/tmp/pr-worktree/{session-id}`
+2. **Accurate review** - Agents read actual PR code, not current branch
+3. **No interference** - User's working directory is unaffected
+4. **Automatic cleanup** - Worktree removed when review completes (success or failure)
 
-**Future `/gh:review-pr --worktree` could:**
-- Create temp worktree: `git worktree add /tmp/pr-worktree-{id} origin/{branch}`
-- Run review against that worktree
-- Clean up worktree when done
-- Enable parallel reviews of multiple PRs
+**Flow:**
+```bash
+# Command fetches PR branch and creates worktree
+git fetch origin {head_branch}
+git worktree add /tmp/pr-worktree/{session} origin/{head_branch}
+
+# Agents review code in worktree
+repo_path = /tmp/pr-worktree/{session}
+
+# Orchestrator cleans up on exit
+git worktree remove /tmp/pr-worktree/{session} --force
+```
+
+**Benefits:**
+- Reviews actual PR code, not whatever branch you're on
+- Enables future test running against PR code
+- Supports parallel reviews of multiple PRs
+- User can continue working while review runs
 
 ## Implementation Details
 

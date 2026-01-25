@@ -87,7 +87,9 @@ Provide your analysis in markdown:
 
 ## Guidelines
 
+- **Focus on the big picture** - Does this PR fit well in the codebase?
 - Be specific: Reference exact files and line numbers
 - Be constructive: Suggest alternatives, not just problems
-- Be proportional: Don't nitpick if there are major issues
+- Be proportional: **Skip nitpicks** - only flag issues that actually matter
 - Consider context: Some violations are acceptable with good reason
+- **Limit findings to 3-5 most important** - quality over quantity

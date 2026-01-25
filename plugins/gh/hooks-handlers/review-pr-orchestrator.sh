@@ -2,10 +2,24 @@
 set -e
 
 work_dir="$1"
-repo_path="$2"  # Explicit repo path for worktree compatibility
+repo_path="$2"  # Path to review (worktree path if using worktree)
+worktree_path="${3:-}"  # Optional: worktree path to clean up when done
+original_repo="${4:-}"  # Optional: original repo for worktree cleanup
 
 # Per-agent timeout (5 minutes)
 AGENT_TIMEOUT=300
+
+# Cleanup function for worktree
+cleanup_worktree() {
+  if [ -n "$worktree_path" ] && [ -d "$worktree_path" ] && [ -n "$original_repo" ]; then
+    echo "Cleaning up worktree: $worktree_path"
+    cd "$original_repo" 2>/dev/null || true
+    git worktree remove "$worktree_path" --force 2>/dev/null || true
+  fi
+}
+
+# Ensure cleanup runs on exit (success or failure)
+trap cleanup_worktree EXIT
 
 # Portable timeout function (works on macOS and Linux)
 run_with_timeout() {
@@ -128,11 +142,11 @@ if ! run_agent "gh:pr-quality-reviewer" "$work_dir/2-quality-pass1.md" \
   exit 1
 fi
 
-# Agent 2: Quality Pass 2 - Validate and challenge
+# Agent 2: Quality Pass 2 - Refine with architecture context
 update_status "in_progress" 3
 if ! run_agent "gh:pr-quality-reviewer" "$work_dir/2-quality-pass2.md" \
-  'Review the previous quality assessment. Validate findings, challenge assumptions, add anything missed:' \
-  "$work_dir/context.json" "$work_dir/2-quality-pass1.md"; then
+  'Refine your quality review using architecture findings. Remove nitpicks, focus on what matters:' \
+  "$work_dir/context.json" "$work_dir/1-architecture.md" "$work_dir/2-quality-pass1.md"; then
   update_status "failed" 3 '"Quality pass 2 failed. Check 2-quality-pass2.md.error for details."'
   exit 1
 fi

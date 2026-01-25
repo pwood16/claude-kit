@@ -136,8 +136,11 @@ Use the `repo_path` from context for file operations:
 
 ## Guidelines
 
-- Be decisive: Give a clear verdict
+- **Big picture first**: Would you approve this PR? Lead with the verdict.
+- Be decisive: Give a clear verdict with confidence
 - Be balanced: Acknowledge strengths, not just problems
 - Be practical: Focus on what matters for this PR
 - Be constructive: Action items should be specific and actionable
+- **Consolidate, don't accumulate**: If previous reviews had 10 findings, your summary should have 3-5 key ones
 - Consider scope: Don't expand the PR's scope with your suggestions
+- **Skip the nitpicks**: Only surface issues that would block or significantly improve the PR

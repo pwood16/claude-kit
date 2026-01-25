@@ -64,16 +64,27 @@ Analyze the PR for quality concerns:
 
 ## Multi-Pass Context
 
-This agent runs in 3 passes:
-- **Pass 1**: Initial comprehensive review
-- **Pass 2**: Validate Pass 1 findings, challenge assumptions, find missed items
-- **Pass 3**: Synthesize passes 1 and 2 into final assessment
+This agent runs in 3 passes. **Focus on the big picture, not nitpicks.**
 
-If you receive previous pass output, your job is to:
-- Verify or refute each finding
-- Add anything the previous pass missed
-- Remove false positives
-- Synthesize into a coherent assessment
+### Pass 1: Initial Review
+- Start fresh with your own comprehensive review
+- Focus on issues that actually matter for this PR's success
+- Prioritize: security > correctness > maintainability > style
+
+### Pass 2: Refine Architecture + Pass 1
+You receive the architecture review AND your Pass 1. Your job:
+- **First**: Review architecture findings - do you agree? Add quality perspective.
+- **Then**: Revisit your Pass 1 findings - which are truly important?
+- Remove nitpicks that don't matter in context
+- Elevate issues the architecture review identified
+- Add quality concerns that complement (not duplicate) architecture
+
+### Pass 3: Synthesize into Final Assessment
+You receive Pass 1 AND Pass 2. Create a unified quality assessment:
+- Consolidate the most important findings only
+- Remove duplicates and contradictions
+- Focus on actionable items that will improve the PR
+- **If previous passes disagree, explain why and pick one**
 
 ## Using Tools
 

@@ -1,12 +1,12 @@
 ---
 description: Run multi-agent PR review in background (architecture, quality, edge cases)
-allowed-tools: Bash(git branch:*), Bash(gh pr view:*), Bash(gh pr diff:*), Bash(gh pr checks:*), Bash(mkdir -p /tmp/pr-review:*), Bash(uuidgen:*), Bash(wc -c < /tmp/pr-review:*), Bash(tr:*), Bash(echo:*), Write(path:/tmp/pr-review/**), Task
+allowed-tools: Bash(git branch:*), Bash(git fetch:*), Bash(git worktree:*), Bash(gh pr view:*), Bash(gh pr diff:*), Bash(gh pr checks:*), Bash(uuidgen:*), Bash(wc:*), Bash(mkdir -p:*), Write(path:**/tmp/pr-review/**), Write(path:**/tmp/pr-worktree/**), Task
 argument-hint: [pr-number-or-branch]
 ---
 
 # Multi-Agent PR Review
 
-Launch a 5-step background review pipeline for a pull request.
+Launch a 5-step background review pipeline for a pull request using a git worktree for isolated code access.
 
 ## Your Task
 
@@ -49,19 +49,46 @@ gh pr checks $PR_NUMBER --json name,state
 
 Also get the list of changed files from the diff output.
 
-### 3. Create work directory
+### 3. Create work directory and session ID
 
-Generate a unique session ID and create the work directory:
+Generate a unique session ID and create the work directory.
 
 ```bash
-session_id=$(uuidgen | tr '[:upper:]' '[:lower:]')
-work_dir="/tmp/pr-review/$session_id"
-mkdir -p "$work_dir"
+# Step 1: Generate session ID (lowercase)
+uuidgen
 ```
 
-### 4. Write context.json
+Take the UUID output and convert to lowercase for the paths:
+- `work_dir` = `/tmp/pr-review/{uuid-lowercase}`
+- `worktree_path` = `/tmp/pr-worktree/{uuid-lowercase}`
 
-Create the context file with ALL gathered information. This must include:
+**Create the work directory:**
+
+```bash
+mkdir -p /tmp/pr-review/{uuid-lowercase}
+```
+
+### 4. Create git worktree for the PR branch
+
+Fetch the PR branch and create an isolated worktree:
+
+```bash
+# Fetch the PR's head branch
+git fetch origin {head_branch}
+
+# Create worktree pointing to the PR branch
+git worktree add "$worktree_path" origin/{head_branch}
+```
+
+This creates an isolated copy of the PR's code that agents can read without affecting your current working directory.
+
+**If worktree creation fails:**
+- Report the error to the user
+- Do not proceed with the review
+
+### 5. Write context.json
+
+Create the context file with ALL gathered information. **Important:** Set `repo_path` to the **worktree path**, not the current directory.
 
 ```json
 {
@@ -99,15 +126,15 @@ Create the context file with ALL gathered information. This must include:
     }
   ],
   "comments": [],
-  "repo_path": "<absolute path to repository>"
+  "repo_path": "<worktree_path>",
+  "worktree_path": "<worktree_path>",
+  "original_repo_path": "<current working directory>"
 }
 ```
 
-The `repo_path` should be the current working directory (the repository root).
-
 Write this to `$work_dir/context.json`.
 
-### 5. Check context size
+### 6. Check context size
 
 Before spawning the orchestrator, check the context.json size:
 ```bash
@@ -116,7 +143,7 @@ wc -c < "$work_dir/context.json"
 
 If it exceeds 500KB (512000 bytes), warn the user that the PR may be too large for effective review but proceed anyway.
 
-### 6. Spawn background review task
+### 7. Spawn background review task
 
 Use the **Task tool** with `run_in_background: true` to launch the review pipeline:
 
@@ -124,13 +151,15 @@ Use the **Task tool** with `run_in_background: true` to launch the review pipeli
 Task tool parameters:
 - subagent_type: "gh:pr-review-launcher"
 - run_in_background: true
-- prompt: "Run the PR review orchestrator. work_dir: {work_dir}, repo_path: {repo_path}"
+- prompt: "Run the PR review orchestrator. work_dir: {work_dir}, repo_path: {worktree_path}, worktree_path: {worktree_path}, original_repo: {original_repo_path}"
 - description: "PR review #{pr_number}"
 ```
 
-This spawns a background agent that will run the orchestrator shell script. The agent will show up in `/tasks` and can be monitored.
+This spawns a background agent that will:
+1. Run the orchestrator shell script against the worktree
+2. Clean up the worktree when done
 
-### 7. Report to user
+### 8. Report to user
 
 Output a summary showing:
 
@@ -143,6 +172,7 @@ Files changed: <count>
 
 Review session: <session_id>
 Work directory: <work_dir>
+Worktree: <worktree_path>
 
 5-step review pipeline:
   1. Architecture & Standards
@@ -160,13 +190,20 @@ Final review:  <work_dir>/3-final-summary.md
 
 - If no PR is found for the branch, inform the user
 - If gh CLI fails, report the error
+- If worktree creation fails, report the error and do not proceed
 - If context gathering fails, stop and report which step failed
 
 ## Note
 
 This command spawns the review as a **background task** and returns immediately. The review pipeline may take several minutes to complete.
 
+**Key feature:** The review runs against a **git worktree** - an isolated checkout of the PR branch. This means:
+- Agents read the actual PR code, not your current branch
+- Your working directory is unaffected
+- Future: enables running tests against the PR code
+
 **To monitor progress:**
 - Use `/tasks` to see the background task status
 - Check `status.json` in the work directory for step-by-step progress
 - The final review will be in `3-final-summary.md`
+- The worktree is automatically cleaned up when the review completes
