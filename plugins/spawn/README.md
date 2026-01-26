@@ -31,11 +31,14 @@ Creates a worktree named `feature-login` and spawns a Claude agent with default 
 Creates the worktree and gives the agent specific instructions.
 
 ### Using a file as the prompt
+
+Ask Claude to read the file and spawn the agent:
 ```
-/spawn:wt-agent feature-login $(cat instructions.md)
+User: "Spawn an agent in worktree 'feature-login' with the prompt from instructions.md"
+Claude: [Reads instructions.md, then uses Skill tool with the file contents]
 ```
 
-Use command substitution to read prompt from a file. This is useful for complex, multi-line prompts.
+This is useful for complex, multi-line prompts stored in files.
 
 ### Agent invocation
 
@@ -82,7 +85,4 @@ Spawned agents appear in dark blue Alacritty windows, making them easy to distin
 
 # Refactoring
 /spawn:wt-agent refactor-components Extract shared components from pages
-
-# Using a file for complex prompts
-/spawn:wt-agent feature-auth $(cat detailed-auth-requirements.md)
 ```
