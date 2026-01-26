@@ -116,17 +116,28 @@ shell_cmd="
 # Spawn new terminal with Claude using the prompt file
 # Set smaller window dimensions and distinctive dark blue background to identify agent terminals
 if [[ "$terminal" == "ghostty" ]]; then
-  ghostty --title="Claude: $repo_name/$worktree_name" \
-    --background="#1a1a2e" \
-    -e zsh -ic "$shell_cmd" >/dev/null 2>&1 &
+  # On macOS, Ghostty CLI doesn't support direct spawning - must use open command
+  if [[ "$(uname)" == "Darwin" ]]; then
+    # Use open to launch Ghostty.app with arguments
+    # Pass background config and command via --args
+    open -na Ghostty.app --args \
+      --background="#1a1a2e" \
+      --title="Claude: $repo_name/$worktree_name" \
+      -e zsh -ic "$shell_cmd" 2>/dev/null
+    # Note: 'open' doesn't create a background job, so no disown needed
+  else
+    ghostty --title="Claude: $repo_name/$worktree_name" \
+      --background="#1a1a2e" \
+      -e zsh -ic "$shell_cmd" >/dev/null 2>&1 &
+    disown 2>/dev/null
+  fi
 else
   alacritty --title "Claude: $repo_name/$worktree_name" \
     -o window.dimensions.columns=120 \
     -o window.dimensions.lines=20 \
     -o 'colors.primary.background="#1a1a2e"' \
     -e zsh -ic "$shell_cmd" >/dev/null 2>&1 &
+  disown 2>/dev/null
 fi
-
-disown
 
 echo "Agent spawned in new terminal"
