@@ -4,13 +4,22 @@ Spawn new Claude agents in git worktrees for parallel development.
 
 ## Description
 
-The `spawn` plugin provides a `/spawn:wt-agent` command that creates isolated git worktrees and launches new Claude instances to work on tasks in parallel. Each spawned agent runs in a distinctive dark blue Alacritty terminal window.
+The `spawn` plugin provides a `/spawn:wt-agent` command that creates isolated git worktrees and launches new Claude instances to work on tasks in parallel. Each spawned agent runs in a distinctive dark blue terminal window.
 
 ## Prerequisites
 
 - Git repository (must be run from within a repo)
-- Alacritty terminal emulator
+- A supported terminal emulator (Ghostty or Alacritty)
 - Claude Code CLI
+
+### Supported Terminals
+
+The plugin automatically detects and uses one of these terminals (in order of preference):
+
+1. **[Ghostty](https://ghostty.org)** - Modern, fast terminal emulator
+2. **[Alacritty](https://alacritty.org)** - GPU-accelerated terminal emulator
+
+If neither is installed, the script will show an error with installation instructions.
 
 **Note:** The spawn-agent script is bundled with the plugin, no separate installation needed.
 
@@ -54,19 +63,20 @@ When you run `/spawn:wt-agent <worktree-name> [prompt]`:
 
 1. Creates git worktree at `<repo-root>/<worktree-name>`
 2. Generates prompt file at `.agent-prompts/<worktree-name>.md`
-3. Spawns new Alacritty window with:
+3. Spawns new terminal window with:
    - Title: `Claude: <repo-name>/<worktree-name>`
-   - Size: 120×20 (compact)
+   - Size: 120×20 (compact, Alacritty only)
    - Background: Dark blue (#1a1a2e) for easy identification
 4. Launches Claude in the worktree with your prompt
 
 ## Identifying Spawned Agents
 
-Spawned agents appear in dark blue Alacritty windows, making them easy to distinguish from your main terminal.
+Spawned agents appear in dark blue terminal windows (with a `#1a1a2e` background), making them easy to distinguish from your main terminal.
 
 ## Error Handling
 
 - **Not in git repo**: Shows friendly error message
+- **No supported terminal**: Shows error with installation links for Ghostty and Alacritty
 - **Script not found**: Provides installation instructions
 - **Worktree exists**: Script reuses existing worktree
 - **Worktree creation fails**: Shows git error

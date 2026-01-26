@@ -3,9 +3,13 @@
 #
 # Usage: spawn-agent <worktree-name> [prompt]
 #
-# Creates a git worktree and opens a new Alacritty terminal with Claude
-# working in that worktree. Optionally provide a prompt to give the agent
-# specific instructions.
+# Creates a git worktree and opens a new terminal (Ghostty or Alacritty)
+# with Claude working in that worktree. Optionally provide a prompt to
+# give the agent specific instructions.
+#
+# Supported terminals (checked in order):
+#   - Ghostty (https://ghostty.org)
+#   - Alacritty (https://alacritty.org)
 #
 # Examples:
 #   spawn-agent feature-login "Add login form to the frontend"
@@ -85,20 +89,20 @@ echo "Worktree created at: $worktree_path"
 echo "Prompt file created at: $prompt_file"
 echo "Spawning Claude agent..."
 
-# Check if alacritty is available
-if ! command -v alacritty &> /dev/null; then
-  echo "Error: Alacritty not found. Install with: brew install alacritty" >&2
+# Detect available terminal emulator (prefer Ghostty, fall back to Alacritty)
+terminal=""
+if command -v ghostty &> /dev/null; then
+  terminal="ghostty"
+elif command -v alacritty &> /dev/null; then
+  terminal="alacritty"
+else
+  echo "Error: No supported terminal found." >&2
+  echo "Install one of: ghostty (https://ghostty.org), alacritty (brew install alacritty)" >&2
   exit 1
 fi
 
-# Spawn new terminal with Claude using the prompt file
-# Set smaller window dimensions: 120 columns x 20 lines
-# Set distinctive dark blue background to identify agent terminals
-alacritty --title "Claude: $repo_name/$worktree_name" \
-  -o window.dimensions.columns=120 \
-  -o window.dimensions.lines=20 \
-  -o 'colors.primary.background="#1a1a2e"' \
-  -e zsh -ic "
+# Build the shell command to run in the new terminal
+shell_cmd="
   cd '$worktree_path' && \
   echo 'Starting Claude agent for: $worktree_name' && \
   echo 'Repository: $repo_name' && \
@@ -107,7 +111,21 @@ alacritty --title "Claude: $repo_name/$worktree_name" \
   echo '---' && \
   claude --dangerously-skip-permissions -p \"\$(cat '$prompt_file')\"; \
   exec zsh
-" >/dev/null 2>&1 &
+"
+
+# Spawn new terminal with Claude using the prompt file
+# Set smaller window dimensions and distinctive dark blue background to identify agent terminals
+if [[ "$terminal" == "ghostty" ]]; then
+  ghostty --title="Claude: $repo_name/$worktree_name" \
+    --background="#1a1a2e" \
+    -e zsh -ic "$shell_cmd" >/dev/null 2>&1 &
+else
+  alacritty --title "Claude: $repo_name/$worktree_name" \
+    -o window.dimensions.columns=120 \
+    -o window.dimensions.lines=20 \
+    -o 'colors.primary.background="#1a1a2e"' \
+    -e zsh -ic "$shell_cmd" >/dev/null 2>&1 &
+fi
 
 disown
 

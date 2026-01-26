@@ -50,13 +50,13 @@ If the script fails (non-zero exit):
 - Common errors the script handles:
   - Not in a git repository
   - Worktree creation failure
-  - Alacritty not available
+  - No supported terminal available (Ghostty or Alacritty)
 
 ### 5. Confirm Success
 
 When successful, inform the user:
 - Worktree name
-- That a new dark blue Alacritty window has been spawned
+- That a new dark blue terminal window has been spawned (Ghostty or Alacritty)
 - Window title: "Claude: <repo-name>/<worktree-name>"
 - The new agent is working in isolation with the provided prompt
 
@@ -91,7 +91,7 @@ The agent should:
 
 **What this command can do:**
 - Create git worktrees in the current repository
-- Spawn new Alacritty terminal windows
+- Spawn new terminal windows (Ghostty or Alacritty)
 - Launch Claude instances with specific prompts
 
 **What it cannot do:**
