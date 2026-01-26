@@ -1,0 +1,8 @@
+{
+  "name": "spawn",
+  "description": "Spawn Claude agents in git worktrees for parallel development",
+  "version": "1.0.0",
+  "author": {
+    "name": "Phil"
+  }
+}
