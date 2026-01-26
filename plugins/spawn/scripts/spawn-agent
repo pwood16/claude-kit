@@ -1,0 +1,114 @@
+#!/bin/zsh
+# spawn-agent - Spawn a new Claude agent in a git worktree
+#
+# Usage: spawn-agent <worktree-name> [prompt]
+#
+# Creates a git worktree and opens a new Alacritty terminal with Claude
+# working in that worktree. Optionally provide a prompt to give the agent
+# specific instructions.
+#
+# Examples:
+#   spawn-agent feature-login "Add login form to the frontend"
+#   spawn-agent bugfix-auth
+
+set -e
+
+worktree_name=${1:?"Usage: spawn-agent <worktree-name> [prompt]"}
+# Capture all remaining arguments as the prompt
+shift
+prompt="${*:-Begin working in this worktree. Check git status and recent commits to understand the context.}"
+
+# Verify we're in a git repository
+if ! git rev-parse --git-dir &> /dev/null; then
+  echo "Error: Not in a git repository" >&2
+  exit 1
+fi
+
+repo_root=$(git rev-parse --show-toplevel)
+repo_name=$(basename "$repo_root")
+worktree_path="$repo_root/$worktree_name"
+
+# Check if worktree already exists
+if [[ -d "$worktree_path" ]]; then
+  echo "Worktree already exists at: $worktree_path"
+  echo "Using existing worktree..."
+else
+  # Create worktree at repo root using absolute path
+  echo "Creating worktree: $worktree_name..."
+  if ! git worktree add "$worktree_path" -b "$worktree_name" 2>/dev/null; then
+    # Branch might already exist, try without -b
+    git worktree add "$worktree_path" "$worktree_name" 2>/dev/null || {
+      echo "Error: Failed to create worktree '$worktree_name'" >&2
+      exit 1
+    }
+  fi
+fi
+
+# Create a simple prompt file
+prompts_dir="$repo_root/.agent-prompts"
+mkdir -p "$prompts_dir"
+prompt_file="$prompts_dir/$worktree_name.md"
+
+# Write the prompt file in parts to safely handle special characters in $prompt
+cat > "$prompt_file" <<EOF
+# Task: $worktree_name
+
+## Context
+
+You are working in a git worktree for: **$worktree_name**
+
+- **Repository:** $repo_name
+- **Working Directory:** $worktree_path
+
+## Instructions
+
+EOF
+
+# Append the user's prompt without shell expansion
+printf '%s\n' "$prompt" >> "$prompt_file"
+
+# Append the footer
+cat >> "$prompt_file" <<'EOF'
+
+## Notes
+
+- This is a git worktree, so you have an isolated working directory
+- Commit your changes as you make progress
+- When done, you can merge this branch back to main
+
+---
+
+Begin working.
+EOF
+
+echo "Worktree created at: $worktree_path"
+echo "Prompt file created at: $prompt_file"
+echo "Spawning Claude agent..."
+
+# Check if alacritty is available
+if ! command -v alacritty &> /dev/null; then
+  echo "Error: Alacritty not found. Install with: brew install alacritty" >&2
+  exit 1
+fi
+
+# Spawn new terminal with Claude using the prompt file
+# Set smaller window dimensions: 120 columns x 20 lines
+# Set distinctive dark blue background to identify agent terminals
+alacritty --title "Claude: $repo_name/$worktree_name" \
+  -o window.dimensions.columns=120 \
+  -o window.dimensions.lines=20 \
+  -o 'colors.primary.background="#1a1a2e"' \
+  -e zsh -ic "
+  cd '$worktree_path' && \
+  echo 'Starting Claude agent for: $worktree_name' && \
+  echo 'Repository: $repo_name' && \
+  echo 'Worktree: $worktree_path' && \
+  echo 'Prompt: $prompt_file' && \
+  echo '---' && \
+  claude --dangerously-skip-permissions -p \"\$(cat '$prompt_file')\"; \
+  exec zsh
+" >/dev/null 2>&1 &
+
+disown
+
+echo "Agent spawned in new terminal"
