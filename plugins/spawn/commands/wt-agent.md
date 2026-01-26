@@ -67,10 +67,7 @@ When successful, inform the user:
 /spawn:wt-agent feature-login
 /spawn:wt-agent feature-login Add user login form with email/password
 /spawn:wt-agent bugfix-auth Fix authentication token expiration issue
-/spawn:wt-agent feature-auth $(cat auth-requirements.md)
 ```
-
-Note: Users can use command substitution `$(cat file.md)` to pass file contents as the prompt.
 
 **Agent invocation (when user asks for parallel work):**
 
@@ -78,10 +75,13 @@ When user says things like:
 - "Let's work on the login feature in a separate agent"
 - "Can you spawn an agent to handle the tests?"
 - "Create a new worktree for this bugfix"
+- "Spawn an agent with the prompt from instructions.md"
 
 The agent should:
 1. Determine appropriate worktree name (e.g., feature-login, test-suite, bugfix-auth)
 2. Formulate clear prompt for the spawned agent
+   - If user references a file, read it first using the Read tool
+   - Then pass the file contents as the prompt argument
 3. Use the Skill tool to invoke the slash command:
    ```
    Skill tool with skill: "spawn:wt-agent", args: "<worktree-name> <prompt>"
