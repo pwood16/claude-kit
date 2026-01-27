@@ -7,19 +7,14 @@
   },
   "plugins": [
     {
-      "name": "prior-session",
-      "source": "./plugins/prior-session",
-      "description": "Automatically capture and browse summaries of cleared sessions"
+      "name": "spawn",
+      "source": "./plugins/spawn",
+      "description": "Spawn Claude agents in git worktrees for parallel development"
     },
     {
       "name": "gh",
       "source": "./plugins/gh",
       "description": "GitHub workflow commands for branch management and PR review"
-    },
-    {
-      "name": "spawn",
-      "source": "./plugins/spawn",
-      "description": "Spawn Claude agents in git worktrees for parallel development"
     }
   ]
 }

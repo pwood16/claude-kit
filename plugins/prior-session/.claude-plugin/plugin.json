@@ -1,8 +1,0 @@
-{
-  "name": "claude-kit",
-  "description": "Productivity toolkit for Claude Code including enhanced statusline and session tracking",
-  "author": {
-    "name": "Phil",
-    "email": ""
-  }
-}
