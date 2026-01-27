@@ -13,3 +13,7 @@ Thumbs.db
 .cache/
 tmp/
 temp/
+
+# Claude Code local files
+.agent-prompts/
+.claude/settings.local.json

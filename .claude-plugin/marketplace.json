@@ -2,7 +2,7 @@
   "name": "claude-kit",
   "description": "Productivity toolkit marketplace for Claude Code",
   "owner": {
-    "name": "Philip Wood",
+    "name": "pwood16",
     "email": "pwood16@gmail.com"
   },
   "plugins": [

@@ -43,8 +43,6 @@ claude plugin install <plugin-name>@claude-kit --scope project
 claude plugin install gh@claude-kit --scope user
 ```
 
-**Note**: This is a private repository. You'll need SSH access configured to install the marketplace.
-
 ## Development
 
 To test plugins without installing via the marketplace:
