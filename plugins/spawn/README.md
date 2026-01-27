@@ -16,12 +16,12 @@ The `spawn` plugin provides a `/spawn:wt-agent` command that creates isolated gi
 
 ## Usage
 
-### Basic usage (default prompt)
+### Basic usage (interactive mode, default)
 ```
 /spawn:wt-agent feature-login
 ```
 
-Creates a worktree named `feature-login` and spawns a Claude agent with default instructions.
+Creates a worktree named `feature-login` and spawns an interactive Claude agent. After completing the initial task, the agent stays in REPL mode so you can continue the conversation.
 
 ### With custom prompt
 ```
@@ -29,6 +29,26 @@ Creates a worktree named `feature-login` and spawns a Claude agent with default 
 ```
 
 Creates the worktree and gives the agent specific instructions.
+
+### Print mode (auto-close when done)
+```
+/spawn:wt-agent research-task Explore alternative approaches --mode print
+```
+
+Spawns an agent that completes the task and exits. The terminal window automatically closes when done. Useful for:
+- Spawning multiple agents for parallel research
+- One-shot tasks where no interaction is needed
+- Batch operations
+
+### Interactive mode (explicit)
+```
+/spawn:wt-agent feature-api Build REST API endpoints --mode interactive
+```
+
+Explicitly set interactive mode. After completing the initial prompt, the agent stays open for follow-up questions. You can:
+- Press **Ctrl+O** to toggle thinking visibility
+- Use **/rename** to name the session
+- Use **/resume** later to continue the conversation
 
 ### Using a file as the prompt
 
@@ -46,11 +66,14 @@ When you ask your agent to work on something in parallel:
 ```
 User: "Let's add user authentication in a separate agent"
 Agent: [Uses Skill tool with skill: "spawn:wt-agent", args: "feature-auth Add user authentication system"]
+
+User: "Spawn 5 agents to research different approaches, have them close when done"
+Agent: [Uses Skill tool with --mode print for each agent]
 ```
 
 ## What Happens
 
-When you run `/spawn:wt-agent <worktree-name> [prompt]`:
+When you run `/spawn:wt-agent <worktree-name> [prompt] [--mode interactive|print]`:
 
 1. Creates git worktree at `<repo-root>/<worktree-name>`
 2. Generates prompt file at `.agent-prompts/<worktree-name>.md`
@@ -59,6 +82,9 @@ When you run `/spawn:wt-agent <worktree-name> [prompt]`:
    - Size: 120×20 (compact)
    - Background: Dark blue (#1a1a2e) for easy identification
 4. Launches Claude in the worktree with your prompt
+5. Behavior depends on mode:
+   - **Interactive mode** (default): Agent completes the initial prompt, then stays in REPL mode for continued conversation. Terminal stays open.
+   - **Print mode**: Agent completes the initial prompt and exits. Terminal automatically closes when done.
 
 ## Identifying Spawned Agents
 
@@ -74,15 +100,23 @@ Spawned agents appear in dark blue Alacritty windows, making them easy to distin
 ## Examples
 
 ```bash
-# Simple feature work
+# Simple feature work (interactive mode, default)
 /spawn:wt-agent feature-dashboard
 
-# Bug fix with context
+# Bug fix with context (interactive, can ask follow-ups)
 /spawn:wt-agent bugfix-auth Fix token expiration issue in auth middleware
 
-# Testing work
+# Testing work (interactive)
 /spawn:wt-agent test-suite Add integration tests for API endpoints
 
-# Refactoring
+# Refactoring (interactive)
 /spawn:wt-agent refactor-components Extract shared components from pages
+
+# Research task (print mode, auto-closes when done)
+/spawn:wt-agent research-options Investigate caching strategies --mode print
+
+# Parallel research (spawn multiple in print mode)
+/spawn:wt-agent research-alpha Explore approach A --mode print
+/spawn:wt-agent research-beta Explore approach B --mode print
+/spawn:wt-agent research-gamma Explore approach C --mode print
 ```
