@@ -105,7 +105,7 @@ alacritty --title "Claude: $repo_name/$worktree_name" \
   echo 'Worktree: $worktree_path' && \
   echo 'Prompt: $prompt_file' && \
   echo '---' && \
-  claude --dangerously-skip-permissions -p \"\$(cat '$prompt_file')\"; \
+  claude --dangerously-skip-permissions -p \"\$(cat \"$prompt_file\")\"; \
   exec zsh
 " >/dev/null 2>&1 &
 
