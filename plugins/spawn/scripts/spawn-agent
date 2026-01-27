@@ -120,7 +120,7 @@ fi
 
 # Build the shell command based on mode
 if [[ "$mode" == "print" ]]; then
-  # Print mode: use -p flag, don't exec zsh (terminal closes after completion)
+  # Print mode: use -p flag, terminal closes after completion
   shell_cmd="
     cd '$worktree_path' && \
     echo 'Starting Claude agent for: $worktree_name (print mode)' && \
@@ -131,7 +131,7 @@ if [[ "$mode" == "print" ]]; then
     claude --dangerously-skip-permissions -p \"\$(cat \"$prompt_file\")\"
   "
 else
-  # Interactive mode: no -p flag, exec zsh to keep terminal open
+  # Interactive mode: exec directly into claude (replaces shell process)
   shell_cmd="
     cd '$worktree_path' && \
     echo 'Starting Claude agent for: $worktree_name (interactive mode)' && \
@@ -139,8 +139,7 @@ else
     echo 'Worktree: $worktree_path' && \
     echo 'Mode: interactive (use Ctrl+O to see thinking, /rename to name session)' && \
     echo '---' && \
-    claude --dangerously-skip-permissions \"\$(cat \"$prompt_file\")\"; \
-    exec zsh
+    exec claude --dangerously-skip-permissions \"\$(cat \"$prompt_file\")\"
   "
 fi
 
