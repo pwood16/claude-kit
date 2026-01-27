@@ -1,22 +1,49 @@
 #!/bin/zsh
 # spawn-agent - Spawn a new Claude agent in a git worktree
 #
-# Usage: spawn-agent <worktree-name> [prompt]
+# Usage: spawn-agent <worktree-name> [prompt] [--mode interactive|print]
 #
-# Creates a git worktree and opens a new Alacritty terminal with Claude
-# working in that worktree. Optionally provide a prompt to give the agent
-# specific instructions.
+# Creates a git worktree and opens a new terminal with Claude
+# working in that worktree. Optionally provide a prompt and mode.
+#
+# Modes:
+#   interactive (default) - Agent stays in REPL after prompt, terminal stays open
+#   print               - Agent completes prompt and exits, terminal auto-closes
 #
 # Examples:
 #   spawn-agent feature-login "Add login form to the frontend"
-#   spawn-agent bugfix-auth
+#   spawn-agent bugfix-auth --mode print
+#   spawn-agent research-task "Investigate options" --mode interactive
 
 set -e
 
-worktree_name=${1:?"Usage: spawn-agent <worktree-name> [prompt]"}
-# Capture all remaining arguments as the prompt
+worktree_name=${1:?"Usage: spawn-agent <worktree-name> [prompt] [--mode interactive|print]"}
 shift
-prompt="${*:-Begin working in this worktree. Check git status and recent commits to understand the context.}"
+
+# Parse arguments for --mode flag
+mode="interactive"  # default
+args=()
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --mode)
+      mode="$2"
+      shift 2
+      ;;
+    *)
+      args+=("$1")
+      shift
+      ;;
+  esac
+done
+
+# Validate mode
+if [[ "$mode" != "interactive" && "$mode" != "print" ]]; then
+  echo "Error: Invalid mode '$mode'. Must be 'interactive' or 'print'" >&2
+  exit 1
+fi
+
+# Reconstruct prompt from remaining args
+prompt="${args[*]:-Begin working in this worktree. Check git status and recent commits to understand the context.}"
 
 # Verify we're in a git repository
 if ! git rev-parse --git-dir &> /dev/null; then
@@ -91,6 +118,32 @@ if ! command -v alacritty &> /dev/null; then
   exit 1
 fi
 
+# Build the shell command based on mode
+if [[ "$mode" == "print" ]]; then
+  # Print mode: use -p flag, don't exec zsh (terminal closes after completion)
+  shell_cmd="
+    cd '$worktree_path' && \
+    echo 'Starting Claude agent for: $worktree_name (print mode)' && \
+    echo 'Repository: $repo_name' && \
+    echo 'Worktree: $worktree_path' && \
+    echo 'Mode: print (terminal will close when complete)' && \
+    echo '---' && \
+    claude --dangerously-skip-permissions -p \"\$(cat \"$prompt_file\")\"
+  "
+else
+  # Interactive mode: no -p flag, exec zsh to keep terminal open
+  shell_cmd="
+    cd '$worktree_path' && \
+    echo 'Starting Claude agent for: $worktree_name (interactive mode)' && \
+    echo 'Repository: $repo_name' && \
+    echo 'Worktree: $worktree_path' && \
+    echo 'Mode: interactive (use Ctrl+O to see thinking, /rename to name session)' && \
+    echo '---' && \
+    claude --dangerously-skip-permissions \"\$(cat \"$prompt_file\")\"; \
+    exec zsh
+  "
+fi
+
 # Spawn new terminal with Claude using the prompt file
 # Set smaller window dimensions: 120 columns x 20 lines
 # Set distinctive dark blue background to identify agent terminals
@@ -98,17 +151,8 @@ alacritty --title "Claude: $repo_name/$worktree_name" \
   -o window.dimensions.columns=120 \
   -o window.dimensions.lines=20 \
   -o 'colors.primary.background="#1a1a2e"' \
-  -e zsh -ic "
-  cd '$worktree_path' && \
-  echo 'Starting Claude agent for: $worktree_name' && \
-  echo 'Repository: $repo_name' && \
-  echo 'Worktree: $worktree_path' && \
-  echo 'Prompt: $prompt_file' && \
-  echo '---' && \
-  claude --dangerously-skip-permissions -p \"\$(cat \"$prompt_file\")\"; \
-  exec zsh
-" >/dev/null 2>&1 &
+  -e zsh -ic "$shell_cmd" >/dev/null 2>&1 &
 
 disown
 
-echo "Agent spawned in new terminal"
+echo "Agent spawned in new terminal (mode: $mode)"
