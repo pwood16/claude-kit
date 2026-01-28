@@ -15,6 +15,11 @@
       "name": "gh",
       "source": "./plugins/gh",
       "description": "GitHub workflow commands for branch management and PR review"
+    },
+    {
+      "name": "planning",
+      "source": "./plugins/planning",
+      "description": "Product planning and specification agents for structured development workflows"
     }
   ]
 }

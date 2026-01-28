@@ -1,0 +1,8 @@
+{
+  "name": "planning",
+  "description": "Product planning and specification agents for structured development workflows",
+  "version": "1.0.0",
+  "author": {
+    "name": "claude-kit"
+  }
+}

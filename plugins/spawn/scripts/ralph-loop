@@ -1,0 +1,208 @@
+#!/bin/zsh
+# ralph-loop - Run a Ralph Wiggum loop on a PRD file
+#
+# Usage: ralph-loop --prd <file> [--max-iterations N] [--completion-promise TEXT]
+#
+# Iteratively runs claude -p to work through PRD stories until complete.
+# Exits when: all stories complete, max-iterations reached, or completion promise detected.
+
+set -e
+
+# Parse arguments
+prd_file=""
+max_iterations=0
+completion_promise="TASK COMPLETE"
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --prd)
+      prd_file="$2"
+      shift 2
+      ;;
+    --max-iterations)
+      max_iterations="$2"
+      shift 2
+      ;;
+    --completion-promise)
+      completion_promise="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$prd_file" ]]; then
+  echo "Error: --prd <file> is required" >&2
+  exit 1
+fi
+
+if [[ ! -f "$prd_file" ]]; then
+  echo "Error: PRD file not found: $prd_file" >&2
+  exit 1
+fi
+
+# Validate jq is available
+if ! command -v jq &> /dev/null; then
+  echo "Error: jq is required but not installed. Install with: brew install jq" >&2
+  exit 1
+fi
+
+# Validate PRD file is valid JSON with stories array
+if ! jq -e '.stories' "$prd_file" > /dev/null 2>&1; then
+  echo "Error: PRD file is not valid JSON or missing 'stories' array: $prd_file" >&2
+  exit 1
+fi
+
+prd_basename=$(basename "$prd_file")
+prd_name="${prd_basename%.json}"
+progress_file="${prd_name}-progress.txt"
+
+# Create progress file if it doesn't exist
+if [[ ! -f "$progress_file" ]]; then
+  cat > "$progress_file" <<EOF
+# Progress Log for $prd_name
+# Started: $(date +"%Y-%m-%d %H:%M:%S")
+
+EOF
+fi
+
+# Generate the prompt
+prompt="# Ralph Wiggum Loop - Iteration Prompt
+
+You are an autonomous AI agent working through a spec to complete all stories.
+
+## Your Task
+
+1. Read \`$prd_basename\` to understand the stories and their status
+2. Read \`$progress_file\` to understand what has been learned in previous iterations
+3. Select the highest-priority incomplete story that is not blocked
+4. Implement the story completely
+5. Update \`$prd_basename\` to mark the story with \`\"status\": \"complete\"\` when done
+6. Append learnings to \`$progress_file\`
+
+## Important Rules
+
+- **One story per iteration**: Focus on completing one story fully before moving to the next
+- **Update the spec file**: When a story is complete, set \`\"status\": \"complete\"\`
+- **Append to progress file**: Document what you did, any issues encountered, and learnings
+- **Stay focused**: Only work on stories in this spec, ignore other specs
+- **Completion promise**: When all stories are complete, output exactly: \`$completion_promise\`
+
+## Story Priority Order
+
+1. First, complete all P0 stories (highest priority)
+2. Then, complete P1 stories
+3. Then, complete P2 stories
+4. Respect \`blocked_by\` dependencies - don't start a story until its dependencies are complete
+
+## Verification
+
+Before marking a story as complete:
+- All items in the story's \`acceptance_criteria\` array are satisfied
+- Code compiles/lints without errors
+- No obvious errors in the implementation
+
+## Begin
+
+Read \`$prd_basename\` and \`$progress_file\` now, then implement the next incomplete story."
+
+# Function to check if all stories are complete
+check_completion() {
+  local result
+  if ! result=$(jq '[.stories[] | select(.status != "complete" and .status != "done")] | length' "$prd_file" 2>&1); then
+    echo "Error: Failed to parse PRD file: $result" >&2
+    exit 1
+  fi
+  echo "$result"
+}
+
+echo '======================================'
+echo '  Ralph Wiggum Loop'
+echo '======================================'
+echo ''
+echo "PRD file:           $prd_basename"
+echo "Progress file:      $progress_file"
+echo "Max iterations:     $max_iterations"
+echo "Completion promise: $completion_promise"
+echo ''
+
+iteration=0
+
+while true; do
+  # Check max iterations
+  if [[ $max_iterations -gt 0 ]] && [[ $iteration -ge $max_iterations ]]; then
+    echo "Max iterations ($max_iterations) reached."
+    break
+  fi
+
+  iteration=$((iteration + 1))
+
+  echo '--------------------------------------'
+  echo "  Iteration $iteration of $max_iterations"
+  echo '--------------------------------------'
+
+  # Check if all stories are complete
+  pending=$(check_completion)
+  if [[ "$pending" -eq 0 ]]; then
+    echo 'All stories complete! Exiting loop.'
+    break
+  fi
+
+  echo "Pending stories: $pending"
+  echo ''
+
+  # Log iteration start
+  echo '' >> "$progress_file"
+  echo "### Iteration $iteration - $(date '+%Y-%m-%d %H:%M:%S')" >> "$progress_file"
+
+  # Run Claude with the prompt, capturing output
+  echo 'Running Claude...'
+  iteration_output_file=$(mktemp)
+  if claude --dangerously-skip-permissions --verbose -p "$prompt" 2>&1 | tee "$iteration_output_file"; then
+    echo 'Iteration completed successfully'
+    echo 'Status: Completed' >> "$progress_file"
+
+    # Check if completion promise was output
+    if grep -qF "$completion_promise" "$iteration_output_file"; then
+      echo ''
+      echo "Completion promise detected: '$completion_promise'"
+      rm -f "$iteration_output_file"
+      break
+    fi
+  else
+    echo 'Iteration failed'
+    echo 'Status: Failed' >> "$progress_file"
+  fi
+  rm -f "$iteration_output_file"
+
+  # Commit any changes
+  if [[ -n "$(git status --porcelain)" ]]; then
+    echo 'Committing changes...'
+    git add -A
+    git commit -m "[$prd_name] Ralph iteration $iteration
+
+Co-Authored-By: Claude <noreply@anthropic.com>" || true
+  fi
+
+  sleep 2
+done
+
+echo ''
+echo '======================================'
+echo '  Ralph Loop Complete'
+echo '======================================'
+
+final_pending=$(check_completion)
+if [[ "$final_pending" -eq 0 ]]; then
+  echo 'SUCCESS: All stories completed!'
+else
+  echo "INCOMPLETE: $final_pending stories remaining"
+fi
+
+echo ''
+echo 'Dropping into interactive shell. Use "exit" to close terminal.'
+echo ''
+exec $SHELL
