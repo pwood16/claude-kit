@@ -16,10 +16,11 @@ input=$(cat)
 
 # Consolidate JSON parsing into single jq call using TSV output
 # If jq fails (invalid JSON), set safe defaults
-if ! IFS=$'\t' read -r model current_dir tokens < <(echo "$input" | jq -r '[
+if ! IFS=$'\t' read -r model current_dir tokens context_limit < <(echo "$input" | jq -r '[
     (.model.display_name // "Unknown"),
     (.workspace.current_dir // "~"),
-    (.context_window.total_input_tokens + .context_window.total_output_tokens)
+    (.context_window.total_input_tokens + .context_window.total_output_tokens),
+    (.context_window.context_window // 200000)
 ] | @tsv' 2>/dev/null); then
   # JSON parsing failed, use safe defaults
   echo "[statusline: invalid JSON input]"
@@ -30,9 +31,30 @@ dir_name=$(basename "$current_dir")
 
 # Validate numeric values
 [[ ! "$tokens" =~ ^[0-9]+$ ]] && tokens=0
+[[ ! "$context_limit" =~ ^[0-9]+$ ]] && context_limit=200000
 
-# Format tokens with commas (fallback to plain number if locale doesn't support)
-tokens_formatted=$(printf "%'d" "$tokens" 2>/dev/null || echo "$tokens")
+# Calculate remaining percentage
+if [ "$context_limit" -gt 0 ]; then
+  remaining_pct=$(( 100 - (tokens * 100 / context_limit) ))
+  [ "$remaining_pct" -lt 0 ] && remaining_pct=0
+else
+  remaining_pct=100
+fi
+
+# Format tokens in compact form (e.g., 49k, 200k)
+format_compact() {
+  local num=$1
+  if [ "$num" -ge 1000000 ]; then
+    printf "%.1fM" "$(echo "scale=1; $num / 1000000" | bc)"
+  elif [ "$num" -ge 1000 ]; then
+    printf "%.0fk" "$(echo "scale=0; $num / 1000" | bc)"
+  else
+    printf "%d" "$num"
+  fi
+}
+
+tokens_compact=$(format_compact "$tokens")
+limit_compact=$(format_compact "$context_limit")
 
 # ANSI color codes using $'...' so escapes are interpreted at assignment time
 # This allows us to use printf '%s' safely later (no interpretation of branch names)
@@ -151,4 +173,4 @@ else
 fi
 
 # Output the status line using printf '%s\n' since colors are already interpreted
-printf '%s\n' "[$model] $git_info | ${tokens_formatted} session tokens"
+printf '%s\n' "[$model] $git_info | ${tokens_compact}/${limit_compact} tokens (${remaining_pct}% remaining)"
