@@ -101,7 +101,7 @@ You are an autonomous AI agent working through a spec to complete all stories.
 ## Verification
 
 Before marking a story as complete:
-- All items in the story's \`acceptance_criteria\` array are satisfied
+- All acceptance criteria met
 - Code compiles/lints without errors
 - No obvious errors in the implementation
 
