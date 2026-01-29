@@ -1,0 +1,8 @@
+{
+  "name": "excalidraw",
+  "description": "Create Excalidraw diagrams from text descriptions",
+  "version": "1.0.0",
+  "author": {
+    "name": "claude-kit"
+  }
+}

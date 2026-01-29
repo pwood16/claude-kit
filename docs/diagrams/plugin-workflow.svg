@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="60 140 1060 360" width="1060" height="360">
+  <style>
+    text {
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 16px;
+      dominant-baseline: middle;
+      text-anchor: middle;
+    }
+    .label-small {
+      font-size: 12px;
+      fill: #495057;
+    }
+  </style>
+
+  <!-- Background -->
+  <rect x="60" y="140" width="1060" height="360" fill="#ffffff"/>
+
+  <!-- Arrow marker definitions -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#1e1e1e"/>
+    </marker>
+    <marker id="arrowhead-gray" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#495057"/>
+    </marker>
+  </defs>
+
+  <!-- Text Description box (blue) -->
+  <rect x="100" y="280" width="160" height="80" rx="8" ry="8" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+  <text x="180" y="320" fill="#1e1e1e">Text Description</text>
+
+  <!-- Arrow 1: Text Description -> Claude Analysis -->
+  <line x1="260" y1="320" x2="350" y2="320" stroke="#1e1e1e" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+  <!-- Claude Analysis box (purple) -->
+  <rect x="360" y="280" width="160" height="80" rx="8" ry="8" fill="#d0bfff" stroke="#7048e8" stroke-width="2"/>
+  <text x="440" y="320" fill="#1e1e1e">Claude Analysis</text>
+
+  <!-- Arrow 2: Claude Analysis -> .excalidraw file (upper) -->
+  <path d="M 520 300 Q 570 260 610 220" stroke="#1e1e1e" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+
+  <!-- Arrow 3: Claude Analysis -> .svg export (lower) -->
+  <path d="M 520 340 Q 570 380 610 420" stroke="#1e1e1e" stroke-width="2" fill="none" marker-end="url(#arrowhead)"/>
+
+  <!-- .excalidraw file box (green) -->
+  <rect x="620" y="180" width="180" height="80" rx="8" ry="8" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+  <text x="710" y="220" fill="#1e1e1e">.excalidraw file</text>
+
+  <!-- .svg export box (yellow) -->
+  <rect x="620" y="380" width="180" height="80" rx="8" ry="8" fill="#ffec99" stroke="#f08c00" stroke-width="2"/>
+  <text x="710" y="420" fill="#1e1e1e">.svg export</text>
+
+  <!-- Arrow 4: .svg export -> Add to docs (dashed) -->
+  <line x1="800" y1="420" x2="890" y2="420" stroke="#495057" stroke-width="2" stroke-dasharray="8,4" marker-end="url(#arrowhead-gray)"/>
+
+  <!-- "optional" label -->
+  <text x="845" y="400" class="label-small">optional</text>
+
+  <!-- Add to docs box (gray, dashed) -->
+  <rect x="900" y="380" width="180" height="80" rx="8" ry="8" fill="#dee2e6" stroke="#495057" stroke-width="2" stroke-dasharray="8,4"/>
+  <text x="990" y="420" fill="#1e1e1e">Add to docs?</text>
+</svg>
