@@ -22,6 +22,15 @@ GitHub branch and PR workflow automation commands.
 
 See [plugins/gh](plugins/gh) for details.
 
+### [Excalidraw](plugins/excalidraw)
+Create diagrams from text descriptions and export to SVG.
+
+- `/excalidraw:create <name> <description>` - Generate `.excalidraw` and `.svg` files from a description
+- Supports architecture diagrams, flowcharts, entity diagrams, network diagrams, and more
+- Output saved to `docs/diagrams/`
+
+See [plugins/excalidraw](plugins/excalidraw) for details.
+
 ## Installation
 
 ### Add the Marketplace
