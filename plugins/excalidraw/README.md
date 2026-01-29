@@ -48,6 +48,28 @@ The command automatically detects diagram type from your description:
 - **Network diagrams**: topology, connections, nodes
 - **General diagrams**: any visual representation
 
+## Editing Diagrams Manually
+
+To make manual edits to a generated diagram:
+
+1. Open [excalidraw.com](https://excalidraw.com) in your browser
+2. Click the **menu icon** (☰) in the top-left corner
+3. Select **Open** and choose your `.excalidraw` file
+4. Make your edits using the Excalidraw editor
+
+**Saving your changes:**
+
+After editing, you need to update both files:
+
+1. **Save the `.excalidraw` file**: Menu (☰) → Export to file → Save to disk
+2. **Export the `.svg` file**: Menu (☰) → Export image → Select "SVG" → Export
+
+Make sure to save both files to `docs/diagrams/` with the same base name to keep them in sync.
+
+**VS Code alternative:**
+
+The [Excalidraw VS Code extension](https://marketplace.visualstudio.com/items?itemName=pomdtr.excalidraw-editor) lets you edit `.excalidraw` files directly in your editor. To export SVG from VS Code, use the command palette: `Excalidraw: Export to SVG`.
+
 ## Installation
 
 ### From claude-kit marketplace
