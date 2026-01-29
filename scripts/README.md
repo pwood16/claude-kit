@@ -51,6 +51,16 @@ apt-get install jq  # Linux
 
 3. Restart Claude Code
 
+## Staying Up to Date
+
+To automatically get updates when you pull this repo, use a symlink instead of copying:
+
+```bash
+ln -s /path/to/claude-kit/scripts/statusline.sh ~/.claude/statusline.sh
+```
+
+Then whenever you `git pull` the repo, the latest script is immediately available.
+
 ## Configuration
 
 ### Cache Duration
