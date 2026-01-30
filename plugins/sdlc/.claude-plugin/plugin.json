@@ -1,0 +1,8 @@
+{
+  "name": "sdlc",
+  "description": "Software development lifecycle automation commands",
+  "version": "1.0.0",
+  "author": {
+    "name": "Cabe"
+  }
+}

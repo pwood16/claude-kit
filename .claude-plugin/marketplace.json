@@ -20,6 +20,11 @@
       "name": "excalidraw",
       "source": "./plugins/excalidraw",
       "description": "Create Excalidraw diagrams from text descriptions"
+    },
+    {
+      "name": "sdlc",
+      "source": "./plugins/sdlc",
+      "description": "Software development lifecycle automation commands"
     }
   ]
 }
