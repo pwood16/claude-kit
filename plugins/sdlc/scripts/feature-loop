@@ -1,0 +1,626 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
+"""
+feature-loop - Automated SDLC feature planning, implementation, and review loop.
+
+This script chains together the SDLC workflow:
+1. Create a plan using /sdlc:feature
+2. Implement it using ralph-loop (iterative task completion)
+3. Run code review with acr
+4. Triage findings (fix real issues, comment on false positives)
+5. Repeat review until clean (LGTM)
+
+Usage:
+    feature-loop "Add user authentication"
+    feature-loop --prompt "Add search functionality" --max-review-iterations 3
+    feature-loop "Add feature" --max-implement-iterations 10
+"""
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Optional
+
+
+def log(step: str, message: str) -> None:
+    """Log a message with timestamp and step indicator."""
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    print(f"[{timestamp}] [{step}] {message}", flush=True)
+
+
+def run_command(cmd: list[str], capture_output: bool = True) -> subprocess.CompletedProcess:
+    """Run a command and return the result."""
+    if capture_output:
+        return subprocess.run(cmd, capture_output=True, text=True)
+    else:
+        return subprocess.run(cmd, text=True)
+
+
+def check_command_exists(cmd: str) -> bool:
+    """Check if a command exists in PATH."""
+    result = subprocess.run(["which", cmd], capture_output=True, text=True)
+    return result.returncode == 0
+
+
+def find_git_root() -> Optional[Path]:
+    """Find the git root directory, if in a git repository."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=False
+        )
+        if result.returncode == 0:
+            return Path(result.stdout.strip())
+    except Exception:
+        pass
+    return None
+
+
+def discover_config_files(verbose: bool = False) -> list[Path]:
+    """
+    Discover .claude-kit configuration files in order of precedence (lowest to highest).
+
+    Search order:
+    1. User home directory (~/.claude-kit)
+    2. Git root directory (./.claude-kit)
+    3. Current working directory (./.claude-kit)
+
+    Returns list of existing config file paths in precedence order (lowest first).
+    """
+    config_files = []
+
+    # 1. User home directory (lowest precedence)
+    home_config = Path.home() / ".claude-kit"
+    if home_config.exists():
+        config_files.append(home_config)
+        if verbose:
+            log("CONFIG", f"Found config: {home_config}")
+
+    # 2. Git root directory (if in a git repo and different from cwd)
+    git_root = find_git_root()
+    if git_root:
+        git_config = git_root / ".claude-kit"
+        cwd = Path.cwd()
+        if git_config.exists() and git_root != cwd:
+            config_files.append(git_config)
+            if verbose:
+                log("CONFIG", f"Found config: {git_config}")
+
+    # 3. Current working directory (highest precedence)
+    cwd_config = Path.cwd() / ".claude-kit"
+    if cwd_config.exists():
+        config_files.append(cwd_config)
+        if verbose:
+            log("CONFIG", f"Found config: {cwd_config}")
+
+    return config_files
+
+
+def load_config_file(config_path: Path, verbose: bool = False) -> dict[str, Any]:
+    """
+    Load and parse a configuration file.
+
+    Returns the parsed configuration or an empty dict on error.
+    """
+    try:
+        with open(config_path, 'r') as f:
+            config = json.load(f)
+
+        if verbose:
+            log("CONFIG", f"Loaded config from: {config_path}")
+
+        return config
+    except json.JSONDecodeError as e:
+        log("ERROR", f"Invalid JSON in config file {config_path}: {e}")
+        sys.exit(1)
+    except Exception as e:
+        log("ERROR", f"Error reading config file {config_path}: {e}")
+        sys.exit(1)
+
+
+def merge_configs(configs: list[dict[str, Any]]) -> dict[str, Any]:
+    """
+    Merge multiple configuration dictionaries with later configs taking precedence.
+
+    Performs a deep merge of nested dictionaries.
+    """
+    result = {}
+
+    for config in configs:
+        for key, value in config.items():
+            if isinstance(value, dict) and key in result and isinstance(result[key], dict):
+                # Deep merge for nested dicts
+                result[key] = {**result[key], **value}
+            else:
+                result[key] = value
+
+    return result
+
+
+def validate_config(config: dict[str, Any]) -> dict[str, Any]:
+    """
+    Validate configuration values and return validated feature_loop settings.
+
+    Returns a dict with validated feature_loop settings or exits on validation error.
+    """
+    feature_loop_config = config.get("feature_loop", {})
+
+    # Validate that feature_loop is a dict/object, not array or other type
+    if not isinstance(feature_loop_config, dict):
+        log("ERROR", f"feature_loop config must be a JSON object (dict), got: {type(feature_loop_config).__name__}")
+        sys.exit(1)
+
+    # Validate max_review_iterations
+    if "max_review_iterations" in feature_loop_config:
+        value = feature_loop_config["max_review_iterations"]
+        if not isinstance(value, int) or value < 1:
+            log("ERROR", f"max_review_iterations must be a positive integer, got: {value}")
+            sys.exit(1)
+
+    # Validate skip_review
+    if "skip_review" in feature_loop_config:
+        value = feature_loop_config["skip_review"]
+        if not isinstance(value, bool):
+            log("ERROR", f"skip_review must be a boolean (true/false), got: {value}")
+            sys.exit(1)
+
+    # Validate verbose
+    if "verbose" in feature_loop_config:
+        value = feature_loop_config["verbose"]
+        if not isinstance(value, bool):
+            log("ERROR", f"verbose must be a boolean (true/false), got: {value}")
+            sys.exit(1)
+
+    # Validate max_implement_iterations
+    if "max_implement_iterations" in feature_loop_config:
+        value = feature_loop_config["max_implement_iterations"]
+        if not isinstance(value, int) or value < 0:
+            log("ERROR", f"max_implement_iterations must be a non-negative integer, got: {value}")
+            sys.exit(1)
+
+    return feature_loop_config
+
+
+def load_configuration(verbose: bool = False) -> dict[str, Any]:
+    """
+    Load and merge configuration from all discovered config files.
+
+    Returns a dict with feature_loop configuration settings.
+    Precedence: defaults < user home < git root < current dir < CLI args
+    """
+    config_files = discover_config_files(verbose)
+
+    if not config_files and verbose:
+        log("CONFIG", "No configuration files found, using defaults")
+
+    # Load all config files
+    configs = [load_config_file(path, verbose) for path in config_files]
+
+    # Merge configurations
+    merged_config = merge_configs(configs)
+
+    # Validate and extract feature_loop settings
+    feature_loop_config = validate_config(merged_config)
+
+    return feature_loop_config
+
+
+def run_feature_plan(feature_prompt: str, verbose: bool = False) -> str:
+    """
+    Run /sdlc:feature to create a plan.
+
+    Returns the path to the created plan file.
+    """
+    log("PLAN", f"Creating feature plan for: {feature_prompt}")
+
+    prompt = f"/sdlc:feature {feature_prompt}"
+    cmd = ["claude", "--dangerously-skip-permissions", "-p", prompt]
+
+    if verbose:
+        log("PLAN", f"Running: {' '.join(cmd)}")
+
+    result = run_command(cmd)
+
+    if result.returncode != 0:
+        log("PLAN", f"Error creating plan: {result.stderr}")
+        sys.exit(1)
+
+    output = result.stdout + result.stderr
+
+    # Extract the plan file path from the output
+    # Look for patterns like specs/issue-*.md
+    plan_patterns = [
+        r'specs/issue-[\w-]+\.md',
+        r'`(specs/issue-[\w-]+\.md)`',
+        r'created.*?(specs/issue-[\w-]+\.md)',
+    ]
+
+    plan_path = None
+    for pattern in plan_patterns:
+        match = re.search(pattern, output, re.IGNORECASE)
+        if match:
+            # Get the first group if it exists, otherwise the whole match
+            plan_path = match.group(1) if match.lastindex else match.group(0)
+            break
+
+    if not plan_path:
+        # Try to find any recently created spec file
+        # Resolve relative to git root if available, otherwise CWD
+        git_root = find_git_root()
+        base_dir = git_root if git_root else Path.cwd()
+        specs_dir = base_dir / "specs"
+        if specs_dir.exists():
+            spec_files = sorted(specs_dir.glob("issue-*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+            if spec_files:
+                # Return path relative to CWD for compatibility
+                try:
+                    plan_path = str(spec_files[0].relative_to(Path.cwd()))
+                except ValueError:
+                    # If not relative to CWD, use absolute path
+                    plan_path = str(spec_files[0])
+
+    # Resolve plan_path for existence check
+    if plan_path:
+        # If relative path, try relative to git root first, then CWD
+        check_path = Path(plan_path)
+        if not check_path.is_absolute():
+            git_root = find_git_root()
+            if git_root:
+                git_relative = git_root / plan_path
+                if git_relative.exists():
+                    check_path = git_relative
+                    # Normalize plan_path to the resolved absolute path
+                    plan_path = str(check_path)
+        plan_exists = check_path.exists()
+    else:
+        plan_exists = False
+
+    if not plan_path or not plan_exists:
+        log("PLAN", "Failed to find created plan file")
+        log("PLAN", f"Output was:\n{output}")
+        sys.exit(1)
+
+    log("PLAN", f"Plan created: {plan_path}")
+    return plan_path
+
+
+def find_ralph_loop_script() -> Optional[Path]:
+    """Find the ralph-loop script in the spawn plugin."""
+    # Look for ralph-loop relative to this script's location
+    script_dir = Path(__file__).parent
+
+    # Try relative path from sdlc plugin to spawn plugin
+    spawn_script = script_dir.parent.parent / "spawn" / "scripts" / "ralph-loop"
+    if spawn_script.exists():
+        return spawn_script
+
+    # Try git root
+    git_root = find_git_root()
+    if git_root:
+        spawn_script = git_root / "plugins" / "spawn" / "scripts" / "ralph-loop"
+        if spawn_script.exists():
+            return spawn_script
+
+    # Try PATH
+    result = subprocess.run(["which", "ralph-loop"], capture_output=True, text=True)
+    if result.returncode == 0:
+        return Path(result.stdout.strip())
+
+    return None
+
+
+def run_implement(plan_path: str, verbose: bool = False, max_iterations: int = 0) -> None:
+    """Run ralph-loop to implement the plan iteratively."""
+    log("IMPLEMENT", f"Implementing plan with ralph-loop: {plan_path}")
+
+    ralph_script = find_ralph_loop_script()
+    if not ralph_script:
+        log("ERROR", "Could not find ralph-loop script. Ensure spawn plugin is installed.")
+        sys.exit(1)
+
+    cmd = [str(ralph_script), "--spec", plan_path]
+    if max_iterations > 0:
+        cmd.extend(["--max-iterations", str(max_iterations)])
+
+    if verbose:
+        log("IMPLEMENT", f"Running: {' '.join(cmd)}")
+
+    # Run ralph-loop without capturing output so user sees progress
+    result = run_command(cmd, capture_output=False)
+
+    if result.returncode != 0:
+        log("IMPLEMENT", f"Ralph loop exited with code: {result.returncode}")
+        # Don't exit - ralph-loop may exit non-zero if not all tasks complete
+        # The review loop will catch any issues
+
+    log("IMPLEMENT", "Implementation phase complete")
+
+
+def run_review(verbose: bool = False) -> tuple[int, str]:
+    """
+    Run acr --local to perform code review.
+
+    Returns:
+        tuple of (exit_code, output)
+        - exit_code 0: no findings (LGTM)
+        - exit_code 1: findings found
+        - exit_code 2: error
+    """
+    log("REVIEW", "Running code review with acr...")
+
+    cmd = ["acr", "--local"]
+
+    if verbose:
+        log("REVIEW", f"Running: {' '.join(cmd)}")
+
+    result = run_command(cmd)
+    output = result.stdout + result.stderr
+
+    if result.returncode == 0:
+        log("REVIEW", "LGTM - No issues found!")
+    elif result.returncode == 1:
+        log("REVIEW", "Issues found in review")
+    else:
+        log("REVIEW", f"Review error (exit code {result.returncode})")
+
+    return result.returncode, output
+
+
+def triage_and_fix_issues(review_output: str, verbose: bool = False) -> None:
+    """
+    Triage review findings and fix real issues or add comments for false positives.
+    """
+    log("TRIAGE", "Analyzing and addressing review findings...")
+
+    triage_prompt = f"""# Code Review Triage and Fix
+
+You have received the following code review findings from an automated review tool.
+Your task is to analyze each finding and take appropriate action:
+
+## Review Findings
+```
+{review_output}
+```
+
+## Instructions
+
+For each finding above:
+
+1. **Analyze** the finding carefully to determine if it's:
+   - A **real issue** that needs to be fixed
+   - A **false positive** where the current code is actually correct
+
+2. **For real issues**: Fix the code to address the concern. Make the minimal change needed.
+
+3. **For false positives**: Add an explanatory comment at the location of the finding.
+   Use the appropriate comment syntax for the file type (e.g., `// NOTE:` for JS/TS/Java/C,
+   `# NOTE:` for Python/Shell, `/* NOTE: */` for CSS/JSON when supported).
+   The comment should be clear enough that both humans and automated tools understand
+   why this code is correct as-is.
+
+## Important
+
+- Make a judgment call on each finding - not all review findings are valid
+- Be concise in your explanations
+- Only modify files that are directly related to the findings
+- Log which findings you classified as real issues vs false positives
+
+Begin analyzing and fixing the findings now.
+"""
+
+    cmd = ["claude", "--dangerously-skip-permissions", "-p", triage_prompt]
+
+    if verbose:
+        log("TRIAGE", f"Running: {' '.join(cmd)}")
+
+    result = run_command(cmd)
+
+    if result.returncode != 0:
+        log("TRIAGE", f"Error during triage: {result.stderr}")
+        # Don't exit - continue with the loop and try review again
+    else:
+        log("TRIAGE", "Triage and fixes complete")
+
+
+def main() -> None:
+    # Pre-parse to check for --verbose flag (needed for config loading)
+    pre_parser = argparse.ArgumentParser(add_help=False)
+    pre_parser.add_argument("--verbose", "-v", action="store_true")
+    pre_args, _ = pre_parser.parse_known_args()
+
+    # Load configuration from files
+    config = load_configuration(verbose=pre_args.verbose)
+
+    # Get defaults from config (fallback to hardcoded defaults)
+    default_max_iterations = config.get("max_review_iterations", 5)
+    default_max_implement_iterations = config.get("max_implement_iterations", 0)  # 0 = unlimited
+    default_skip_review = config.get("skip_review", False)
+    default_verbose = config.get("verbose", False) or pre_args.verbose
+
+    if default_verbose and config:
+        log("CONFIG", f"Using configuration: max_review_iterations={default_max_iterations}, "
+                     f"max_implement_iterations={default_max_implement_iterations}, "
+                     f"skip_review={default_skip_review}, verbose={default_verbose}")
+
+    parser = argparse.ArgumentParser(
+        description="Automated SDLC feature planning, implementation, and review loop",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+    %(prog)s "Add user authentication"
+    %(prog)s --prompt "Add search" --max-review-iterations 3
+    %(prog)s "Fix login bug" --skip-review
+    %(prog)s "Add feature" --no-verbose  # Override config verbose=true
+    %(prog)s "Add feature" --no-skip-review  # Override config skip_review=true
+
+Configuration:
+    Settings can be configured in .claude-kit files (JSON format).
+    Precedence: CLI args > ./. claude-kit > git-root/.claude-kit > ~/.claude-kit > defaults
+
+    Use --no-verbose and --no-skip-review to explicitly disable config defaults.
+
+    See .claude-kit.example for configuration options.
+        """
+    )
+
+    parser.add_argument(
+        "prompt",
+        nargs="?",
+        help="The feature description to implement"
+    )
+    parser.add_argument(
+        "--prompt", "-p",
+        dest="prompt_flag",
+        help="The feature description (alternative to positional arg)"
+    )
+    parser.add_argument(
+        "--max-review-iterations", "-m",
+        type=int,
+        default=default_max_iterations,
+        help=f"Maximum review/fix cycles (default: {default_max_iterations})"
+    )
+    parser.add_argument(
+        "--max-implement-iterations",
+        type=int,
+        default=default_max_implement_iterations,
+        help=f"Maximum ralph loop iterations for implementation (0=unlimited, default: {default_max_implement_iterations})"
+    )
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        dest="verbose",
+        help="Enable verbose logging"
+    )
+    parser.add_argument(
+        "--no-verbose",
+        action="store_false",
+        dest="verbose",
+        help="Disable verbose logging (override config)"
+    )
+    parser.add_argument(
+        "--skip-review",
+        action="store_true",
+        dest="skip_review",
+        help="Skip the review loop (just plan and implement)"
+    )
+    parser.add_argument(
+        "--no-skip-review",
+        action="store_false",
+        dest="skip_review",
+        help="Enable review loop (override config)"
+    )
+    parser.set_defaults(
+        verbose=default_verbose,
+        skip_review=default_skip_review
+    )
+
+    args = parser.parse_args()
+
+    # Validate max_review_iterations is positive
+    if args.max_review_iterations < 1:
+        parser.error(f"--max-review-iterations must be a positive integer (>=1), got: {args.max_review_iterations}")
+
+    # Get the feature prompt from either positional or flag argument
+    feature_prompt = args.prompt or args.prompt_flag
+
+    if not feature_prompt:
+        parser.error("Feature prompt is required (either positional or --prompt)")
+
+    # Check required tools exist
+    if not check_command_exists("claude"):
+        log("ERROR", "Claude CLI not found in PATH. Please install it first.")
+        sys.exit(1)
+
+    if not args.skip_review and not check_command_exists("acr"):
+        log("ERROR", "acr CLI not found in PATH. Please install it or use --skip-review.")
+        sys.exit(1)
+
+    # Print header
+    print()
+    print("=" * 50)
+    print("  Feature Loop - SDLC Automation")
+    print("=" * 50)
+    print()
+    log("CONFIG", f"Feature: {feature_prompt}")
+    log("CONFIG", f"Max implement iterations: {args.max_implement_iterations} (0=unlimited)")
+    log("CONFIG", f"Max review iterations: {args.max_review_iterations}")
+    log("CONFIG", f"Skip review: {args.skip_review}")
+    log("CONFIG", f"Verbose: {args.verbose}")
+    print()
+
+    # Step 1: Create the plan
+    print("-" * 50)
+    print("  Phase 1: Planning")
+    print("-" * 50)
+    plan_path = run_feature_plan(feature_prompt, args.verbose)
+    print()
+
+    # Step 2: Implement the plan using ralph loop
+    print("-" * 50)
+    print("  Phase 2: Implementation (Ralph Loop)")
+    print("-" * 50)
+    run_implement(plan_path, args.verbose, args.max_implement_iterations)
+    print()
+
+    # Step 3: Review loop (unless skipped)
+    if args.skip_review:
+        log("SKIP", "Skipping review phase as requested")
+    else:
+        print("-" * 50)
+        print("  Phase 3: Review Loop")
+        print("-" * 50)
+
+        for iteration in range(1, args.max_review_iterations + 1):
+            log("LOOP", f"Review iteration {iteration}/{args.max_review_iterations}")
+
+            exit_code, review_output = run_review(args.verbose)
+
+            if exit_code == 0:
+                # LGTM - no issues found
+                log("LOOP", "Code review passed!")
+                break
+            elif exit_code == 1:
+                # Issues found - triage and fix
+                log("LOOP", "Triaging and fixing issues...")
+                triage_and_fix_issues(review_output, args.verbose)
+            else:
+                # Error during review
+                log("ERROR", f"Review failed with exit code {exit_code}")
+                log("ERROR", f"Output: {review_output}")
+                sys.exit(exit_code)
+
+            if iteration == args.max_review_iterations:
+                log("LOOP", f"Max review iterations ({args.max_review_iterations}) reached")
+                log("LOOP", "Some issues may remain - manual review recommended")
+                print()
+                print("=" * 50)
+                print("  Feature Loop Complete (with warnings)")
+                print("=" * 50)
+                print()
+                log("DONE", f"Plan file: {plan_path}")
+                log("ERROR", "Max review iterations reached without LGTM")
+                sys.exit(1)
+
+        print()
+
+    # Final status
+    print("=" * 50)
+    print("  Feature Loop Complete")
+    print("=" * 50)
+    print()
+    log("DONE", f"Plan file: {plan_path}")
+    log("DONE", "Feature loop finished successfully!")
+
+
+if __name__ == "__main__":
+    main()

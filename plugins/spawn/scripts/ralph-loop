@@ -1,22 +1,27 @@
 #!/bin/zsh
-# ralph-loop - Run a Ralph Wiggum loop on a PRD file
+# ralph-loop - Run a Ralph Wiggum loop on a spec file
 #
-# Usage: ralph-loop --prd <file> [--max-iterations N] [--completion-promise TEXT]
+# Usage: ralph-loop --spec <file> [--max-iterations N] [--completion-promise TEXT]
+#        ralph-loop --prd <file> [--max-iterations N] [--completion-promise TEXT]  (legacy JSON format)
 #
-# Iteratively runs claude -p to work through PRD stories until complete.
-# Exits when: all stories complete, max-iterations reached, or completion promise detected.
+# Supports two spec formats:
+#   1. Markdown specs with "## Step by Step Tasks" section (h3 headers as tasks)
+#   2. JSON PRD files with a "stories" array (legacy format)
+#
+# Iteratively runs claude -p to work through spec tasks until complete.
+# Exits when: all tasks complete, max-iterations reached, or completion promise detected.
 
 set -e
 
 # Parse arguments
-prd_file=""
+spec_file=""
 max_iterations=0
 completion_promise="TASK COMPLETE"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --prd)
-      prd_file="$2"
+    --spec|--prd)
+      spec_file="$2"
       shift 2
       ;;
     --max-iterations)
@@ -34,53 +39,79 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$prd_file" ]]; then
-  echo "Error: --prd <file> is required" >&2
+if [[ -z "$spec_file" ]]; then
+  echo "Error: --spec <file> is required" >&2
   exit 1
 fi
 
-if [[ ! -f "$prd_file" ]]; then
-  echo "Error: PRD file not found: $prd_file" >&2
+if [[ ! -f "$spec_file" ]]; then
+  echo "Error: Spec file not found: $spec_file" >&2
   exit 1
 fi
 
-# Validate jq is available
-if ! command -v jq &> /dev/null; then
-  echo "Error: jq is required but not installed. Install with: brew install jq" >&2
-  exit 1
+# Detect spec format based on file extension and content
+spec_format=""
+if [[ "$spec_file" == *.json ]]; then
+  # Validate jq is available for JSON
+  if ! command -v jq &> /dev/null; then
+    echo "Error: jq is required for JSON specs. Install with: brew install jq" >&2
+    exit 1
+  fi
+  # Validate PRD file is valid JSON with stories array
+  if ! jq -e '.stories' "$spec_file" > /dev/null 2>&1; then
+    echo "Error: JSON spec must have a 'stories' array: $spec_file" >&2
+    exit 1
+  fi
+  spec_format="json"
+elif [[ "$spec_file" == *.md ]]; then
+  # Validate markdown has Step by Step Tasks section
+  if ! grep -q "^## Step by Step Tasks" "$spec_file"; then
+    echo "Error: Markdown spec must have '## Step by Step Tasks' section: $spec_file" >&2
+    exit 1
+  fi
+  spec_format="markdown"
+else
+  # Try to auto-detect based on content
+  if jq -e '.stories' "$spec_file" > /dev/null 2>&1; then
+    spec_format="json"
+  elif grep -q "^## Step by Step Tasks" "$spec_file"; then
+    spec_format="markdown"
+  else
+    echo "Error: Could not detect spec format. Use .json or .md extension." >&2
+    exit 1
+  fi
 fi
 
-# Validate PRD file is valid JSON with stories array
-if ! jq -e '.stories' "$prd_file" > /dev/null 2>&1; then
-  echo "Error: PRD file is not valid JSON or missing 'stories' array: $prd_file" >&2
-  exit 1
+spec_basename=$(basename "$spec_file")
+if [[ "$spec_format" == "json" ]]; then
+  spec_name="${spec_basename%.json}"
+else
+  spec_name="${spec_basename%.md}"
 fi
-
-prd_basename=$(basename "$prd_file")
-prd_name="${prd_basename%.json}"
-progress_file="${prd_name}-progress.txt"
+progress_file="${spec_name}-progress.txt"
 
 # Create progress file if it doesn't exist
 if [[ ! -f "$progress_file" ]]; then
   cat > "$progress_file" <<EOF
-# Progress Log for $prd_name
+# Progress Log for $spec_name
 # Started: $(date +"%Y-%m-%d %H:%M:%S")
 
 EOF
 fi
 
-# Generate the prompt
-prompt="# Ralph Wiggum Loop - Iteration Prompt
+# Generate format-specific prompt
+if [[ "$spec_format" == "json" ]]; then
+  prompt="# Ralph Wiggum Loop - Iteration Prompt
 
 You are an autonomous AI agent working through a spec to complete all stories.
 
 ## Your Task
 
-1. Read \`$prd_basename\` to understand the stories and their status
+1. Read \`$spec_basename\` to understand the stories and their status
 2. Read \`$progress_file\` to understand what has been learned in previous iterations
 3. Select the highest-priority incomplete story that is not blocked
 4. Implement the story completely
-5. Update \`$prd_basename\` to mark the story with \`\"status\": \"complete\"\` when done
+5. Update \`$spec_basename\` to mark the story with \`\"status\": \"complete\"\` when done
 6. Append learnings to \`$progress_file\`
 
 ## Important Rules
@@ -107,23 +138,110 @@ Before marking a story as complete:
 
 ## Begin
 
-Read \`$prd_basename\` and \`$progress_file\` now, then implement the next incomplete story."
+Read \`$spec_basename\` and \`$progress_file\` now, then implement the next incomplete story."
+else
+  # Markdown format prompt
+  prompt="# Ralph Wiggum Loop - Iteration Prompt
 
-# Function to check if all stories are complete
+You are an autonomous AI agent working through a feature spec to complete all tasks.
+
+## Your Task
+
+1. Read \`$spec_basename\` to understand the feature and the Step by Step Tasks
+2. Read \`$progress_file\` to understand what has been done in previous iterations
+3. Find the first incomplete task (a task without \`**Status:** complete\` after its heading)
+4. Implement that task completely
+5. Update \`$spec_basename\` to mark the task as complete by adding \`**Status:** complete\` on the line after the h3 heading
+6. Append learnings to \`$progress_file\`
+
+## Important Rules
+
+- **One task per iteration**: Focus on completing one task fully before moving to the next
+- **Execute tasks in order**: Work through tasks from top to bottom as listed in the spec
+- **Mark completion**: After the h3 task heading, add a line: \`**Status:** complete\`
+- **Append to progress file**: Document what you did, any issues encountered, and learnings
+- **Stay focused**: Only work on tasks in this spec
+- **Completion promise**: When all tasks are complete, output exactly: \`$completion_promise\`
+
+## Task Status Format
+
+When a task is incomplete, it looks like:
+\`\`\`
+### Step 1: Create the database schema
+- Create migrations for users table
+- Add indexes
+\`\`\`
+
+When you complete it, add the status line:
+\`\`\`
+### Step 1: Create the database schema
+**Status:** complete
+- Create migrations for users table
+- Add indexes
+\`\`\`
+
+## Verification
+
+Before marking a task as complete:
+- All bullet points under the task are done
+- Code compiles/lints without errors
+- No obvious errors in the implementation
+
+## Begin
+
+Read \`$spec_basename\` and \`$progress_file\` now, then implement the next incomplete task."
+fi
+
+# Function to check if all tasks/stories are complete
 check_completion() {
-  local result
-  if ! result=$(jq '[.stories[] | select(.status != "complete" and .status != "done")] | length' "$prd_file" 2>&1); then
-    echo "Error: Failed to parse PRD file: $result" >&2
-    exit 1
+  if [[ "$spec_format" == "json" ]]; then
+    local result
+    if ! result=$(jq '[.stories[] | select(.status != "complete" and .status != "done")] | length' "$spec_file" 2>&1); then
+      echo "Error: Failed to parse spec file: $result" >&2
+      exit 1
+    fi
+    echo "$result"
+  else
+    # For markdown, count h3 headers in Step by Step Tasks section without "**Status:** complete" after them
+    # Extract the Step by Step Tasks section and count incomplete tasks
+    local in_tasks=false
+    local pending=0
+    local prev_was_h3=false
+
+    while IFS= read -r line; do
+      if [[ "$line" =~ ^"## Step by Step Tasks" ]]; then
+        in_tasks=true
+        continue
+      fi
+      if [[ "$in_tasks" == true && "$line" =~ ^"## " && ! "$line" =~ ^"## Step by Step Tasks" ]]; then
+        # Hit another h2 section, stop
+        break
+      fi
+      if [[ "$in_tasks" == true ]]; then
+        if [[ "$line" =~ ^"### " ]]; then
+          # Found a task header, assume incomplete until we check next line
+          prev_was_h3=true
+          pending=$((pending + 1))
+        elif [[ "$prev_was_h3" == true ]]; then
+          # Check if this line marks completion
+          if [[ "$line" =~ ^\*\*Status:\*\*[[:space:]]*complete ]]; then
+            pending=$((pending - 1))
+          fi
+          prev_was_h3=false
+        fi
+      fi
+    done < "$spec_file"
+
+    echo "$pending"
   fi
-  echo "$result"
 }
 
 echo '======================================'
 echo '  Ralph Wiggum Loop'
 echo '======================================'
 echo ''
-echo "PRD file:           $prd_basename"
+echo "Spec file:          $spec_basename"
+echo "Spec format:        $spec_format"
 echo "Progress file:      $progress_file"
 echo "Max iterations:     $max_iterations"
 echo "Completion promise: $completion_promise"
@@ -182,7 +300,7 @@ while true; do
   if [[ -n "$(git status --porcelain)" ]]; then
     echo 'Committing changes...'
     git add -A
-    git commit -m "[$prd_name] Ralph iteration $iteration
+    git commit -m "[$spec_name] Ralph iteration $iteration
 
 Co-Authored-By: Claude <noreply@anthropic.com>" || true
   fi
