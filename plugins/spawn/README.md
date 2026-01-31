@@ -11,8 +11,9 @@ The `spawn` plugin provides a `/spawn:wt-agent` command that creates isolated gi
 - Git repository (must be run from within a repo)
 - Ghostty or Alacritty terminal emulator
 - Claude Code CLI
+- [uv](https://docs.astral.sh/uv/) (for ralph-loop script)
 
-**Note:** The spawn-agent script is bundled with the plugin, no separate installation needed.
+**Note:** The spawn-agent script is bundled with the plugin, no separate installation needed. The ralph-loop script is implemented in Python and uses uv for dependency management.
 
 ## Usage
 
@@ -55,27 +56,61 @@ Explicitly set interactive mode. After completing the initial prompt, the agent 
 /spawn:wt-agent feature-api --mode ralph --prd specs/api-feature.json --max-iterations 20
 ```
 
-Ralph mode spawns an autonomous agent that works through a structured PRD/spec file, implementing stories in priority order (P0, then P1, then P2). The agent iteratively completes each story, updates the spec, and logs progress.
+Ralph mode spawns an autonomous agent that works through a structured spec file, implementing tasks/stories iteratively. The agent completes each task, updates the spec, and logs progress.
 
 **Key features:**
-- Requires `--prd FILE` pointing to a PRD/spec JSON file with structured stories
-- PRD file is copied to the worktree and a progress file (`<prd-name>-progress.txt`) is created
-- Each iteration spawns a fresh `claude -p` process (bash while loop)
-- Agent reads stories from PRD, selects highest-priority unblocked story, implements it, marks complete
-- Respects `blocked_by` dependencies between stories
+- Requires `--prd FILE` (or `--spec FILE`) pointing to a spec file
+- Supports two spec formats: **Markdown** and **JSON** (see formats below)
+- Spec file is copied to the worktree and a progress file (`<spec-name>-progress.txt`) is created
+- Each iteration spawns a fresh `claude -p` process
+- Agent reads tasks from spec, implements the next incomplete one, marks it complete
 - Automatically commits changes after each iteration
-- Runs until all stories are complete or max iterations reached
+- Runs until all tasks are complete or max iterations reached
 - Terminal has **purple background** (#2e1a4a) and **[Ralph]** title indicator for easy identification
 - No user interaction during iterations
 
 **Required option:**
-- `--prd FILE`: Path to PRD/spec JSON file. Stories must have fields: `id`, `title`, `priority` (P0/P1/P2), `status`, `blocked_by` (array of story IDs)
+- `--prd FILE` or `--spec FILE`: Path to spec file (Markdown or JSON format)
 
 **Optional parameters:**
 - `--max-iterations N`: Stop after N iterations (default: 0 = unlimited)
 - `--completion-promise TEXT`: Stop when TEXT appears in agent output (default: "TASK COMPLETE")
 
-**PRD file format example:**
+#### Markdown Spec Format
+
+Markdown specs use a `## Step by Step Tasks` section with h3 headers as individual tasks. Tasks are executed in order from top to bottom.
+
+```markdown
+# Feature: My Feature
+
+## Step by Step Tasks
+
+### Step 1: Create the database schema
+- Create migrations for users table
+- Add indexes
+
+### Step 2: Implement the API endpoint
+- Create route handler
+- Add validation
+
+### Step 3: Add tests
+- Unit tests for validation
+- Integration tests for endpoint
+```
+
+When a task is completed, the agent adds `**Status:** complete` after the h3 heading:
+
+```markdown
+### Step 1: Create the database schema
+**Status:** complete
+- Create migrations for users table
+- Add indexes
+```
+
+#### JSON Spec Format (Legacy)
+
+JSON specs use a `stories` array with priority and dependency tracking.
+
 ```json
 {
   "name": "Feature Implementation",
@@ -98,18 +133,24 @@ Ralph mode spawns an autonomous agent that works through a structured PRD/spec f
 }
 ```
 
+Stories must have fields: `id`, `title`, `priority` (P0/P1/P2), `status`, `blocked_by` (array of story IDs). Stories are executed in priority order (P0 first, then P1, then P2), respecting `blocked_by` dependencies.
+
 **Use cases:**
-- Spec-driven development: Work through structured PRDs with multiple stories
-- Feature implementation: Complete stories in priority order with dependency tracking
-- Iterative progress tracking: Agent logs learnings and progress after each story
+- Spec-driven development: Work through structured specs with multiple tasks
+- Feature implementation: Complete tasks in order with progress tracking
+- Iterative progress tracking: Agent logs learnings and progress after each task
+- Integration with SDLC plugin: `feature-loop` uses `ralph-loop` internally with Markdown specs
 
 **Example commands:**
 ```
-# Implement API feature spec with iteration limit
+# Implement Markdown feature spec
+/spawn:wt-agent feature-api --mode ralph --spec specs/issue-my-feature.md --max-iterations 20
+
+# Implement JSON PRD with iteration limit
 /spawn:wt-agent feature-api --mode ralph --prd specs/api-feature.json --max-iterations 20
 
 # Work through refactoring spec
-/spawn:wt-agent refactor-auth --mode ralph --prd specs/auth-refactor.json --max-iterations 10
+/spawn:wt-agent refactor-auth --mode ralph --spec specs/auth-refactor.md --max-iterations 10
 
 # Greenfield project with PRD (uses default "TASK COMPLETE" promise)
 /spawn:wt-agent greenfield-app --mode ralph --prd prd.json
@@ -190,12 +231,51 @@ Spawned agents appear in color-coded Alacritty windows:
 /spawn:wt-agent research-beta Explore approach B --mode print
 /spawn:wt-agent research-gamma Explore approach C --mode print
 
-# Spec-driven development with PRD (ralph mode)
+# Spec-driven development with Markdown spec (ralph mode)
+/spawn:wt-agent feature-api --mode ralph --spec specs/issue-my-feature.md --max-iterations 20
+
+# Spec-driven development with JSON PRD (ralph mode)
 /spawn:wt-agent feature-api --mode ralph --prd specs/api-feature.json --max-iterations 20
 
 # Refactoring spec implementation (ralph mode)
-/spawn:wt-agent refactor-auth --mode ralph --prd specs/auth-refactor.json --max-iterations 10
+/spawn:wt-agent refactor-auth --mode ralph --spec specs/auth-refactor.md --max-iterations 10
 
 # Greenfield PRD with default completion promise (ralph mode)
 /spawn:wt-agent greenfield-app --mode ralph --prd prd.json
 ```
+
+## Scripts
+
+### `ralph-loop`
+
+The `ralph-loop` script can also be used standalone (outside of `/spawn:wt-agent`) to iterate through a spec file in the current directory.
+
+**Usage:**
+```bash
+# Run with Markdown spec
+./plugins/spawn/scripts/ralph-loop --spec specs/issue-my-feature.md
+
+# Run with JSON PRD
+./plugins/spawn/scripts/ralph-loop --prd specs/api-feature.json
+
+# With iteration limit
+./plugins/spawn/scripts/ralph-loop --spec specs/feature.md --max-iterations 10
+
+# With custom completion promise
+./plugins/spawn/scripts/ralph-loop --spec specs/feature.md --completion-promise "ALL DONE"
+```
+
+**Options:**
+- `--spec FILE` or `--prd FILE`: Path to spec file (required)
+- `--max-iterations N`: Maximum iterations before stopping (default: 0 = unlimited)
+- `--completion-promise TEXT`: String that signals completion (default: "TASK COMPLETE")
+
+**How it works:**
+1. Validates the spec file format (Markdown or JSON)
+2. Creates a progress file (`<spec-name>-progress.txt`) to track learnings
+3. Loops: reads spec, finds next incomplete task, runs `claude -p` to implement it
+4. Agent updates the spec to mark tasks complete
+5. Commits changes after each iteration
+6. Exits when all tasks are complete or max iterations reached
+
+This script is used internally by the SDLC plugin's `feature-loop` to implement feature specs.

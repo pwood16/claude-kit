@@ -68,6 +68,52 @@ Automated SDLC workflow that chains together planning, implementation, and itera
 - `--max-review-iterations`, `-m`: Maximum review/fix cycles (default: 5)
 - `--skip-review`: Skip the review loop
 - `--verbose`, `-v`: Enable verbose logging
+- `--resume`: Resume from auto-detected checkpoint state
+- `--resume-from PATH`: Resume from specific checkpoint state file
+- `--no-resume`: Force fresh start, ignore existing checkpoint
+
+**Resuming Failed Runs:**
+
+The `feature-loop` script automatically saves checkpoints after each phase (planning, implementation, review iterations), allowing you to resume from the last successful checkpoint if a failure occurs.
+
+**How it works:**
+- After each phase completes successfully, a checkpoint is saved to `.feature-loop-state.json`
+- If the process is interrupted (network issues, errors, keyboard interrupt), the checkpoint remains
+- Use `--resume` to continue from where you left off
+- On successful completion, the checkpoint file is automatically cleaned up
+
+**Resume workflow:**
+```bash
+# Start a feature loop
+./plugins/sdlc/scripts/feature-loop "Add authentication"
+
+# If it fails during implementation or review...
+# Resume from the last checkpoint
+./plugins/sdlc/scripts/feature-loop --resume
+
+# Or specify a specific checkpoint file
+./plugins/sdlc/scripts/feature-loop --resume-from .feature-loop-state.json
+
+# Force a fresh start (ignoring existing checkpoint)
+./plugins/sdlc/scripts/feature-loop --no-resume "Add authentication"
+```
+
+**What gets skipped when resuming:**
+- If checkpoint is in "implementing" phase: skips planning, re-runs implementation and review
+- If checkpoint is in "reviewing" phase: skips planning and implementation, continues review from saved iteration
+
+**Checkpoint file format:**
+The checkpoint file (`.feature-loop-state.json`) contains:
+- Feature prompt and plan file path
+- Current phase and review iteration number
+- Configuration snapshot (for validation on resume)
+- Timestamps for tracking
+
+**Troubleshooting:**
+- If checkpoint is corrupted: use `--no-resume` to start fresh
+- If plan file is missing: restore it or start fresh
+- If checkpoint is from old version: warnings will be shown, consider fresh start
+- Multiple features: each run uses the same checkpoint file, so complete or `--no-resume` before starting another
 
 **Requirements:**
 - `claude` CLI in PATH

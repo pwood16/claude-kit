@@ -27,7 +27,24 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, TypedDict
+
+
+# Checkpoint constants
+CHECKPOINT_VERSION = "1"
+DEFAULT_STATE_FILE = ".feature-loop-state.json"
+
+
+class CheckpointState(TypedDict):
+    """State structure for feature-loop checkpoint/resume functionality."""
+    version: str  # Schema version for forward compatibility
+    feature_prompt: str  # Original feature description
+    plan_path: str  # Path to spec file
+    phase: str  # One of: "planning", "implementing", "reviewing", "complete"
+    review_iteration: int  # Current review iteration, 0 if not in review
+    started_at: str  # ISO timestamp
+    updated_at: str  # ISO timestamp
+    config: dict[str, Any]  # Snapshot of configuration used
 
 
 def log(step: str, message: str) -> None:
@@ -147,17 +164,23 @@ def merge_configs(configs: list[dict[str, Any]]) -> dict[str, Any]:
     return result
 
 
-def validate_config(config: dict[str, Any]) -> dict[str, Any]:
+def validate_config(config: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
     """
-    Validate configuration values and return validated feature_loop settings.
+    Validate configuration values and return validated settings.
 
-    Returns a dict with validated feature_loop settings or exits on validation error.
+    Returns a tuple of (feature_loop_config, acr_config) or exits on validation error.
     """
     feature_loop_config = config.get("feature_loop", {})
+    acr_config = config.get("acr", {})
 
     # Validate that feature_loop is a dict/object, not array or other type
     if not isinstance(feature_loop_config, dict):
         log("ERROR", f"feature_loop config must be a JSON object (dict), got: {type(feature_loop_config).__name__}")
+        sys.exit(1)
+
+    # Validate that acr is a dict/object, not array or other type
+    if not isinstance(acr_config, dict):
+        log("ERROR", f"acr config must be a JSON object (dict), got: {type(acr_config).__name__}")
         sys.exit(1)
 
     # Validate max_review_iterations
@@ -188,14 +211,21 @@ def validate_config(config: dict[str, Any]) -> dict[str, Any]:
             log("ERROR", f"max_implement_iterations must be a non-negative integer, got: {value}")
             sys.exit(1)
 
-    return feature_loop_config
+    # Validate acr.num_reviewers
+    if "num_reviewers" in acr_config:
+        value = acr_config["num_reviewers"]
+        if not isinstance(value, int) or value < 1:
+            log("ERROR", f"acr.num_reviewers must be a positive integer, got: {value}")
+            sys.exit(1)
+
+    return feature_loop_config, acr_config
 
 
-def load_configuration(verbose: bool = False) -> dict[str, Any]:
+def load_configuration(verbose: bool = False) -> tuple[dict[str, Any], dict[str, Any]]:
     """
     Load and merge configuration from all discovered config files.
 
-    Returns a dict with feature_loop configuration settings.
+    Returns a tuple of (feature_loop_config, acr_config).
     Precedence: defaults < user home < git root < current dir < CLI args
     """
     config_files = discover_config_files(verbose)
@@ -209,10 +239,101 @@ def load_configuration(verbose: bool = False) -> dict[str, Any]:
     # Merge configurations
     merged_config = merge_configs(configs)
 
-    # Validate and extract feature_loop settings
-    feature_loop_config = validate_config(merged_config)
+    # Validate and extract settings
+    feature_loop_config, acr_config = validate_config(merged_config)
 
-    return feature_loop_config
+    return feature_loop_config, acr_config
+
+
+def get_state_file_path(feature_prompt: str = "") -> Path:
+    """
+    Generate path for checkpoint state file.
+
+    For now, uses a fixed filename in the current directory.
+    Future enhancement: could generate deterministic filename based on feature_prompt hash.
+    """
+    return Path.cwd() / DEFAULT_STATE_FILE
+
+
+def save_checkpoint(state: CheckpointState, verbose: bool = False) -> None:
+    """
+    Save checkpoint state to disk atomically.
+
+    Uses atomic write (write to temp, then rename) to prevent corruption.
+    """
+    state_file = get_state_file_path(state["feature_prompt"])
+
+    # Update timestamp
+    state["updated_at"] = datetime.now().isoformat()
+
+    try:
+        # Write to temp file first for atomic operation
+        temp_file = state_file.with_suffix(".tmp")
+        with open(temp_file, 'w') as f:
+            json.dump(state, f, indent=2)
+
+        # Atomic rename
+        temp_file.rename(state_file)
+
+        if verbose:
+            log("CHECKPOINT", f"Saved checkpoint: {state_file} (phase: {state['phase']})")
+    except Exception as e:
+        log("ERROR", f"Failed to save checkpoint: {e}")
+        # Don't exit - checkpoint save failure shouldn't stop the workflow
+
+
+def load_checkpoint(state_file: Path, verbose: bool = False) -> Optional[CheckpointState]:
+    """
+    Load checkpoint state from disk.
+
+    Returns None if file doesn't exist or is invalid.
+    Validates version compatibility.
+    """
+    if not state_file.exists():
+        return None
+
+    try:
+        with open(state_file, 'r') as f:
+            state = json.load(f)
+
+        # Validate version
+        if state.get("version") != CHECKPOINT_VERSION:
+            log("WARNING", f"Checkpoint version mismatch: expected {CHECKPOINT_VERSION}, got {state.get('version')}")
+            log("WARNING", "Consider starting fresh with --no-resume")
+            return None
+
+        # Validate required fields
+        required_fields = ["version", "feature_prompt", "plan_path", "phase", "review_iteration", "started_at", "updated_at", "config"]
+        for field in required_fields:
+            if field not in state:
+                log("WARNING", f"Invalid checkpoint: missing field '{field}'")
+                return None
+
+        if verbose:
+            log("CHECKPOINT", f"Loaded checkpoint: {state_file} (phase: {state['phase']})")
+
+        return state
+    except json.JSONDecodeError as e:
+        log("WARNING", f"Corrupted checkpoint file: {e}")
+        return None
+    except Exception as e:
+        log("WARNING", f"Failed to load checkpoint: {e}")
+        return None
+
+
+def clear_checkpoint(state_file: Path, verbose: bool = False) -> None:
+    """
+    Remove checkpoint state file.
+
+    Safe to call if file doesn't exist.
+    """
+    if state_file.exists():
+        try:
+            state_file.unlink()
+            if verbose:
+                log("CHECKPOINT", f"Cleared checkpoint: {state_file}")
+        except Exception as e:
+            log("WARNING", f"Failed to clear checkpoint: {e}")
 
 
 def run_feature_plan(feature_prompt: str, verbose: bool = False) -> str:
@@ -346,9 +467,13 @@ def run_implement(plan_path: str, verbose: bool = False, max_iterations: int = 0
     log("IMPLEMENT", "Implementation phase complete")
 
 
-def run_review(verbose: bool = False) -> tuple[int, str]:
+def run_review(verbose: bool = False, num_reviewers: int = 0) -> tuple[int, str]:
     """
     Run acr --local to perform code review.
+
+    Args:
+        verbose: Enable verbose logging
+        num_reviewers: Number of reviewers to use (0 = use acr default)
 
     Returns:
         tuple of (exit_code, output)
@@ -359,6 +484,8 @@ def run_review(verbose: bool = False) -> tuple[int, str]:
     log("REVIEW", "Running code review with acr...")
 
     cmd = ["acr", "--local"]
+    if num_reviewers > 0:
+        cmd.extend(["--reviewers", str(num_reviewers)])
 
     if verbose:
         log("REVIEW", f"Running: {' '.join(cmd)}")
@@ -439,18 +566,20 @@ def main() -> None:
     pre_args, _ = pre_parser.parse_known_args()
 
     # Load configuration from files
-    config = load_configuration(verbose=pre_args.verbose)
+    feature_loop_config, acr_config = load_configuration(verbose=pre_args.verbose)
 
     # Get defaults from config (fallback to hardcoded defaults)
-    default_max_iterations = config.get("max_review_iterations", 5)
-    default_max_implement_iterations = config.get("max_implement_iterations", 0)  # 0 = unlimited
-    default_skip_review = config.get("skip_review", False)
-    default_verbose = config.get("verbose", False) or pre_args.verbose
+    default_max_iterations = feature_loop_config.get("max_review_iterations", 5)
+    default_max_implement_iterations = feature_loop_config.get("max_implement_iterations", 0)  # 0 = unlimited
+    default_skip_review = feature_loop_config.get("skip_review", False)
+    default_verbose = feature_loop_config.get("verbose", False) or pre_args.verbose
+    default_num_reviewers = acr_config.get("num_reviewers", 0)  # 0 = use acr default
 
-    if default_verbose and config:
+    if default_verbose and (feature_loop_config or acr_config):
         log("CONFIG", f"Using configuration: max_review_iterations={default_max_iterations}, "
                      f"max_implement_iterations={default_max_implement_iterations}, "
-                     f"skip_review={default_skip_review}, verbose={default_verbose}")
+                     f"skip_review={default_skip_review}, verbose={default_verbose}, "
+                     f"acr.num_reviewers={default_num_reviewers}")
 
     parser = argparse.ArgumentParser(
         description="Automated SDLC feature planning, implementation, and review loop",
@@ -476,12 +605,28 @@ Configuration:
     parser.add_argument(
         "prompt",
         nargs="?",
-        help="The feature description to implement"
+        help="The feature description to implement (optional when resuming)"
     )
     parser.add_argument(
         "--prompt", "-p",
         dest="prompt_flag",
         help="The feature description (alternative to positional arg)"
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume from auto-detected checkpoint state"
+    )
+    parser.add_argument(
+        "--resume-from",
+        type=str,
+        metavar="PATH",
+        help="Resume from specific checkpoint state file"
+    )
+    parser.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="Force fresh start, ignore existing checkpoint"
     )
     parser.add_argument(
         "--max-review-iterations", "-m",
@@ -519,6 +664,12 @@ Configuration:
         dest="skip_review",
         help="Enable review loop (override config)"
     )
+    parser.add_argument(
+        "--num-reviewers",
+        type=int,
+        default=default_num_reviewers,
+        help=f"Number of acr reviewers (0=use acr default, default: {default_num_reviewers})"
+    )
     parser.set_defaults(
         verbose=default_verbose,
         skip_review=default_skip_review
@@ -526,15 +677,30 @@ Configuration:
 
     args = parser.parse_args()
 
+    # Validate conflicting resume flags
+    if args.resume and args.no_resume:
+        parser.error("Cannot specify both --resume and --no-resume")
+
+    if args.resume_from and args.no_resume:
+        parser.error("Cannot specify both --resume-from and --no-resume")
+
+    if args.resume and args.resume_from:
+        parser.error("Cannot specify both --resume and --resume-from")
+
     # Validate max_review_iterations is positive
     if args.max_review_iterations < 1:
         parser.error(f"--max-review-iterations must be a positive integer (>=1), got: {args.max_review_iterations}")
 
+    # Validate num_reviewers is non-negative
+    if args.num_reviewers < 0:
+        parser.error(f"--num-reviewers must be a non-negative integer (>=0), got: {args.num_reviewers}")
+
     # Get the feature prompt from either positional or flag argument
     feature_prompt = args.prompt or args.prompt_flag
 
-    if not feature_prompt:
-        parser.error("Feature prompt is required (either positional or --prompt)")
+    # Prompt is required unless resuming
+    if not feature_prompt and not args.resume and not args.resume_from:
+        parser.error("Feature prompt is required (either positional or --prompt) unless resuming")
 
     # Check required tools exist
     if not check_command_exists("claude"):
@@ -544,6 +710,43 @@ Configuration:
     if not args.skip_review and not check_command_exists("acr"):
         log("ERROR", "acr CLI not found in PATH. Please install it or use --skip-review.")
         sys.exit(1)
+
+    # Handle resume logic
+    checkpoint_state: Optional[CheckpointState] = None
+    resuming = False
+
+    if args.resume or args.resume_from:
+        # User explicitly wants to resume
+        if args.resume_from:
+            state_file = Path(args.resume_from)
+        else:
+            state_file = get_state_file_path(feature_prompt or "")
+
+        checkpoint_state = load_checkpoint(state_file, args.verbose)
+
+        if checkpoint_state is None:
+            log("ERROR", f"Cannot resume: checkpoint file not found or invalid: {state_file}")
+            sys.exit(1)
+
+        # Validate resumed state
+        plan_file = Path(checkpoint_state["plan_path"])
+        if not plan_file.exists():
+            log("ERROR", f"Cannot resume: plan file not found: {checkpoint_state['plan_path']}")
+            sys.exit(1)
+
+        # Use feature_prompt from checkpoint if not provided
+        if not feature_prompt:
+            feature_prompt = checkpoint_state["feature_prompt"]
+
+        resuming = True
+        log("RESUME", f"Resuming from checkpoint (phase: {checkpoint_state['phase']}, iteration: {checkpoint_state['review_iteration']})")
+
+    elif not args.no_resume:
+        # Check for existing state file and suggest resume
+        state_file = get_state_file_path(feature_prompt or "")
+        if state_file.exists():
+            log("INFO", f"Found existing checkpoint: {state_file}")
+            log("INFO", "Use --resume to continue from checkpoint, or --no-resume to start fresh")
 
     # Print header
     print()
@@ -555,22 +758,59 @@ Configuration:
     log("CONFIG", f"Max implement iterations: {args.max_implement_iterations} (0=unlimited)")
     log("CONFIG", f"Max review iterations: {args.max_review_iterations}")
     log("CONFIG", f"Skip review: {args.skip_review}")
+    log("CONFIG", f"Num reviewers: {args.num_reviewers} (0=acr default)")
     log("CONFIG", f"Verbose: {args.verbose}")
     print()
 
     # Step 1: Create the plan
-    print("-" * 50)
-    print("  Phase 1: Planning")
-    print("-" * 50)
-    plan_path = run_feature_plan(feature_prompt, args.verbose)
-    print()
+    if resuming and checkpoint_state["phase"] != "planning":
+        # Skip planning phase when resuming past it
+        log("RESUME", "Skipping planning phase (already completed)")
+        plan_path = checkpoint_state["plan_path"]
+        print()
+    else:
+        print("-" * 50)
+        print("  Phase 1: Planning")
+        print("-" * 50)
+        plan_path = run_feature_plan(feature_prompt, args.verbose)
+
+        # Save checkpoint after planning
+        current_config = {
+            "max_review_iterations": args.max_review_iterations,
+            "max_implement_iterations": args.max_implement_iterations,
+            "skip_review": args.skip_review,
+            "verbose": args.verbose,
+            "num_reviewers": args.num_reviewers,
+        }
+        checkpoint_state = CheckpointState(
+            version=CHECKPOINT_VERSION,
+            feature_prompt=feature_prompt,
+            plan_path=plan_path,
+            phase="implementing",
+            review_iteration=0,
+            started_at=checkpoint_state["started_at"] if checkpoint_state else datetime.now().isoformat(),
+            updated_at=datetime.now().isoformat(),
+            config=current_config,
+        )
+        save_checkpoint(checkpoint_state, args.verbose)
+        print()
 
     # Step 2: Implement the plan using ralph loop
-    print("-" * 50)
-    print("  Phase 2: Implementation (Ralph Loop)")
-    print("-" * 50)
-    run_implement(plan_path, args.verbose, args.max_implement_iterations)
-    print()
+    if resuming and checkpoint_state["phase"] == "reviewing":
+        # Skip implementation phase when resuming in review phase
+        log("RESUME", "Skipping implementation phase (already completed)")
+        print()
+    else:
+        print("-" * 50)
+        print("  Phase 2: Implementation (Ralph Loop)")
+        print("-" * 50)
+        run_implement(plan_path, args.verbose, args.max_implement_iterations)
+
+        # Save checkpoint after implementation
+        checkpoint_state["phase"] = "reviewing"
+        checkpoint_state["review_iteration"] = 0
+        save_checkpoint(checkpoint_state, args.verbose)
+        print()
 
     # Step 3: Review loop (unless skipped)
     if args.skip_review:
@@ -580,10 +820,17 @@ Configuration:
         print("  Phase 3: Review Loop")
         print("-" * 50)
 
-        for iteration in range(1, args.max_review_iterations + 1):
+        # Determine starting iteration for review loop
+        start_iteration = 1
+        if resuming and checkpoint_state["phase"] == "reviewing":
+            start_iteration = checkpoint_state["review_iteration"] + 1
+            if start_iteration > 1:
+                log("RESUME", f"Resuming review from iteration {start_iteration}")
+
+        for iteration in range(start_iteration, args.max_review_iterations + 1):
             log("LOOP", f"Review iteration {iteration}/{args.max_review_iterations}")
 
-            exit_code, review_output = run_review(args.verbose)
+            exit_code, review_output = run_review(args.verbose, args.num_reviewers)
 
             if exit_code == 0:
                 # LGTM - no issues found
@@ -593,6 +840,10 @@ Configuration:
                 # Issues found - triage and fix
                 log("LOOP", "Triaging and fixing issues...")
                 triage_and_fix_issues(review_output, args.verbose)
+
+                # Save checkpoint after review iteration
+                checkpoint_state["review_iteration"] = iteration
+                save_checkpoint(checkpoint_state, args.verbose)
             else:
                 # Error during review
                 log("ERROR", f"Review failed with exit code {exit_code}")
@@ -620,6 +871,10 @@ Configuration:
     print()
     log("DONE", f"Plan file: {plan_path}")
     log("DONE", "Feature loop finished successfully!")
+
+    # Clear checkpoint on successful completion
+    state_file = get_state_file_path(feature_prompt)
+    clear_checkpoint(state_file, args.verbose)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,16 @@
+{
+  "version": "1",
+  "feature_prompt": "Add resilience to the `feature-loop` script by implementing a checkpoint system that saves state after each phase and allows resuming from the last successful checkpoint when a failure occurs. This enables users to recover from failures (network issues, process interruptions, errors) without restarting the entire workflow from scratch",
+  "plan_path": "/Users/cabewaldrop/dev/claude-kit/specs/issue-feature-loop-checkpoint-resume.md",
+  "phase": "reviewing",
+  "review_iteration": 0,
+  "started_at": "2026-01-31T15:20:52.435453",
+  "updated_at": "2026-01-31T15:20:52.536314",
+  "config": {
+    "max_review_iterations": 5,
+    "max_implement_iterations": 0,
+    "skip_review": false,
+    "verbose": false,
+    "num_reviewers": 5
+  }
+}

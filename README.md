@@ -22,6 +22,17 @@ GitHub branch and PR workflow automation commands.
 
 See [plugins/gh](plugins/gh) for details.
 
+### [SDLC](plugins/sdlc)
+Software development lifecycle automation for planning and implementing features.
+
+- `/sdlc:feature <description>` - Create a detailed implementation plan for a new feature
+- `/sdlc:bug <description>` - Create a plan to fix a bug
+- `/sdlc:chore <description>` - Create a plan for maintenance tasks
+- `/sdlc:implement <spec-file>` - Implement a plan file step by step
+- `feature-loop` script - Automated end-to-end workflow: plan → implement → review → fix
+
+See [plugins/sdlc](plugins/sdlc) for details.
+
 ### [Excalidraw](plugins/excalidraw)
 Create diagrams from text descriptions and export to SVG.
 

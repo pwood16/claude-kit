@@ -1,0 +1,327 @@
+#!/bin/zsh
+# ralph-loop - Run a Ralph Wiggum loop on a spec file
+#
+# Usage: ralph-loop --spec <file> [--max-iterations N] [--completion-promise TEXT]
+#        ralph-loop --prd <file> [--max-iterations N] [--completion-promise TEXT]  (legacy JSON format)
+#
+# Supports two spec formats:
+#   1. Markdown specs with "## Step by Step Tasks" section (h3 headers as tasks)
+#   2. JSON PRD files with a "stories" array (legacy format)
+#
+# Iteratively runs claude -p to work through spec tasks until complete.
+# Exits when: all tasks complete, max-iterations reached, or completion promise detected.
+
+set -e
+
+# Parse arguments
+spec_file=""
+max_iterations=0
+completion_promise="TASK COMPLETE"
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --spec|--prd)
+      spec_file="$2"
+      shift 2
+      ;;
+    --max-iterations)
+      max_iterations="$2"
+      shift 2
+      ;;
+    --completion-promise)
+      completion_promise="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$spec_file" ]]; then
+  echo "Error: --spec <file> is required" >&2
+  exit 1
+fi
+
+if [[ ! -f "$spec_file" ]]; then
+  echo "Error: Spec file not found: $spec_file" >&2
+  exit 1
+fi
+
+# Detect spec format based on file extension and content
+spec_format=""
+if [[ "$spec_file" == *.json ]]; then
+  # Validate jq is available for JSON
+  if ! command -v jq &> /dev/null; then
+    echo "Error: jq is required for JSON specs. Install with: brew install jq" >&2
+    exit 1
+  fi
+  # Validate PRD file is valid JSON with stories array
+  if ! jq -e '.stories' "$spec_file" > /dev/null 2>&1; then
+    echo "Error: JSON spec must have a 'stories' array: $spec_file" >&2
+    exit 1
+  fi
+  spec_format="json"
+elif [[ "$spec_file" == *.md ]]; then
+  # Validate markdown has Step by Step Tasks section
+  if ! grep -q "^## Step by Step Tasks" "$spec_file"; then
+    echo "Error: Markdown spec must have '## Step by Step Tasks' section: $spec_file" >&2
+    exit 1
+  fi
+  spec_format="markdown"
+else
+  # Try to auto-detect based on content
+  if jq -e '.stories' "$spec_file" > /dev/null 2>&1; then
+    spec_format="json"
+  elif grep -q "^## Step by Step Tasks" "$spec_file"; then
+    spec_format="markdown"
+  else
+    echo "Error: Could not detect spec format. Use .json or .md extension." >&2
+    exit 1
+  fi
+fi
+
+spec_basename=$(basename "$spec_file")
+if [[ "$spec_format" == "json" ]]; then
+  spec_name="${spec_basename%.json}"
+else
+  spec_name="${spec_basename%.md}"
+fi
+progress_file="${spec_name}-progress.txt"
+
+# Create progress file if it doesn't exist
+if [[ ! -f "$progress_file" ]]; then
+  cat > "$progress_file" <<EOF
+# Progress Log for $spec_name
+# Started: $(date +"%Y-%m-%d %H:%M:%S")
+
+EOF
+fi
+
+# Generate format-specific prompt
+if [[ "$spec_format" == "json" ]]; then
+  prompt="# Ralph Wiggum Loop - Iteration Prompt
+
+You are an autonomous AI agent working through a spec to complete all stories.
+
+## Your Task
+
+1. Read \`$spec_basename\` to understand the stories and their status
+2. Read \`$progress_file\` to understand what has been learned in previous iterations
+3. Select the highest-priority incomplete story that is not blocked
+4. Implement the story completely
+5. Update \`$spec_basename\` to mark the story with \`\"status\": \"complete\"\` when done
+6. Append learnings to \`$progress_file\`
+
+## Important Rules
+
+- **One story per iteration**: Focus on completing one story fully before moving to the next
+- **Update the spec file**: When a story is complete, set \`\"status\": \"complete\"\`
+- **Append to progress file**: Document what you did, any issues encountered, and learnings
+- **Stay focused**: Only work on stories in this spec, ignore other specs
+- **Completion promise**: When all stories are complete, output exactly: \`$completion_promise\`
+
+## Story Priority Order
+
+1. First, complete all P0 stories (highest priority)
+2. Then, complete P1 stories
+3. Then, complete P2 stories
+4. Respect \`blocked_by\` dependencies - don't start a story until its dependencies are complete
+
+## Verification
+
+Before marking a story as complete:
+- All acceptance criteria met
+- Code compiles/lints without errors
+- No obvious errors in the implementation
+
+## Begin
+
+Read \`$spec_basename\` and \`$progress_file\` now, then implement the next incomplete story."
+else
+  # Markdown format prompt
+  prompt="# Ralph Wiggum Loop - Iteration Prompt
+
+You are an autonomous AI agent working through a feature spec to complete all tasks.
+
+## Your Task
+
+1. Read \`$spec_basename\` to understand the feature and the Step by Step Tasks
+2. Read \`$progress_file\` to understand what has been done in previous iterations
+3. Find the first incomplete task (a task without \`**Status:** complete\` after its heading)
+4. Implement that task completely
+5. Update \`$spec_basename\` to mark the task as complete by adding \`**Status:** complete\` on the line after the h3 heading
+6. Append learnings to \`$progress_file\`
+
+## Important Rules
+
+- **One task per iteration**: Focus on completing one task fully before moving to the next
+- **Execute tasks in order**: Work through tasks from top to bottom as listed in the spec
+- **Mark completion**: After the h3 task heading, add a line: \`**Status:** complete\`
+- **Append to progress file**: Document what you did, any issues encountered, and learnings
+- **Stay focused**: Only work on tasks in this spec
+- **Completion promise**: When all tasks are complete, output exactly: \`$completion_promise\`
+
+## Task Status Format
+
+When a task is incomplete, it looks like:
+\`\`\`
+### Step 1: Create the database schema
+- Create migrations for users table
+- Add indexes
+\`\`\`
+
+When you complete it, add the status line:
+\`\`\`
+### Step 1: Create the database schema
+**Status:** complete
+- Create migrations for users table
+- Add indexes
+\`\`\`
+
+## Verification
+
+Before marking a task as complete:
+- All bullet points under the task are done
+- Code compiles/lints without errors
+- No obvious errors in the implementation
+
+## Begin
+
+Read \`$spec_basename\` and \`$progress_file\` now, then implement the next incomplete task."
+fi
+
+# Function to check if all tasks/stories are complete
+check_completion() {
+  if [[ "$spec_format" == "json" ]]; then
+    local result
+    if ! result=$(jq '[.stories[] | select(.status != "complete" and .status != "done")] | length' "$spec_file" 2>&1); then
+      echo "Error: Failed to parse spec file: $result" >&2
+      exit 1
+    fi
+    echo "$result"
+  else
+    # For markdown, count h3 headers in Step by Step Tasks section without "**Status:** complete" after them
+    # Extract the Step by Step Tasks section and count incomplete tasks
+    local in_tasks=false
+    local pending=0
+    local prev_was_h3=false
+
+    while IFS= read -r line; do
+      # Use glob patterns with == instead of regex with =~ to avoid zsh regex escaping issues
+      if [[ "$line" == "## Step by Step Tasks"* ]]; then
+        in_tasks=true
+        continue
+      fi
+      if [[ "$in_tasks" == true && "$line" == "## "* && "$line" != "## Step by Step Tasks"* ]]; then
+        # Hit another h2 section, stop
+        break
+      fi
+      if [[ "$in_tasks" == true ]]; then
+        if [[ "$line" == "### "* ]]; then
+          # Found a task header, assume incomplete until we check next line
+          prev_was_h3=true
+          pending=$((pending + 1))
+        elif [[ "$prev_was_h3" == true ]]; then
+          # Check if this line marks completion (handles **Status:** complete with optional whitespace)
+          if [[ "$line" == "**Status:**"*"complete"* ]]; then
+            pending=$((pending - 1))
+          fi
+          prev_was_h3=false
+        fi
+      fi
+    done < "$spec_file"
+
+    echo "$pending"
+  fi
+}
+
+echo '======================================'
+echo '  Ralph Wiggum Loop'
+echo '======================================'
+echo ''
+echo "Spec file:          $spec_basename"
+echo "Spec format:        $spec_format"
+echo "Progress file:      $progress_file"
+echo "Max iterations:     $max_iterations"
+echo "Completion promise: $completion_promise"
+echo ''
+
+iteration=0
+
+while true; do
+  # Check max iterations
+  if [[ $max_iterations -gt 0 ]] && [[ $iteration -ge $max_iterations ]]; then
+    echo "Max iterations ($max_iterations) reached."
+    break
+  fi
+
+  iteration=$((iteration + 1))
+
+  echo '--------------------------------------'
+  echo "  Iteration $iteration of $max_iterations"
+  echo '--------------------------------------'
+
+  # Check if all stories are complete
+  pending=$(check_completion)
+  if [[ "$pending" -eq 0 ]]; then
+    echo 'All stories complete! Exiting loop.'
+    break
+  fi
+
+  echo "Pending stories: $pending"
+  echo ''
+
+  # Log iteration start
+  echo '' >> "$progress_file"
+  echo "### Iteration $iteration - $(date '+%Y-%m-%d %H:%M:%S')" >> "$progress_file"
+
+  # Run Claude with the prompt, capturing output
+  echo 'Running Claude...'
+  iteration_output_file=$(mktemp)
+  if claude --dangerously-skip-permissions --verbose -p "$prompt" 2>&1 | tee "$iteration_output_file"; then
+    echo 'Iteration completed successfully'
+    echo 'Status: Completed' >> "$progress_file"
+
+    # Check if completion promise was output
+    if grep -qF "$completion_promise" "$iteration_output_file"; then
+      echo ''
+      echo "Completion promise detected: '$completion_promise'"
+      rm -f "$iteration_output_file"
+      break
+    fi
+  else
+    echo 'Iteration failed'
+    echo 'Status: Failed' >> "$progress_file"
+  fi
+  rm -f "$iteration_output_file"
+
+  # Commit any changes
+  if [[ -n "$(git status --porcelain)" ]]; then
+    echo 'Committing changes...'
+    git add -A
+    git commit -m "[$spec_name] Ralph iteration $iteration
+
+Co-Authored-By: Claude <noreply@anthropic.com>" || true
+  fi
+
+  sleep 2
+done
+
+echo ''
+echo '======================================'
+echo '  Ralph Loop Complete'
+echo '======================================'
+
+final_pending=$(check_completion)
+if [[ "$final_pending" -eq 0 ]]; then
+  echo 'SUCCESS: All stories completed!'
+else
+  echo "INCOMPLETE: $final_pending stories remaining"
+fi
+
+echo ''
+echo 'Dropping into interactive shell. Use "exit" to close terminal.'
+echo ''
+exec $SHELL
