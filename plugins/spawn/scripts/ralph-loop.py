@@ -36,6 +36,18 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+# Import structured logger
+try:
+    from lib.logger import StructuredLogger
+except ImportError:
+    # Handle case where lib is not in the path
+    import sys
+    from pathlib import Path
+    script_dir = Path(__file__).parent
+    lib_dir = script_dir.parent / "lib"
+    sys.path.insert(0, str(lib_dir))
+    from logger import StructuredLogger
+
 
 def log(step: str, message: str) -> None:
     """Log a message with step indicator."""
@@ -369,13 +381,33 @@ def check_completion_promise(output: str, promise: str) -> bool:
     return promise in output
 
 
-def run_claude_iteration(prompt: str, progress_file: Path, iteration: int) -> tuple[int, str]:
+def run_claude_iteration(
+    prompt: str,
+    progress_file: Path,
+    iteration: int,
+    model: str = "claude",
+    logger: Optional[StructuredLogger] = None
+) -> tuple[int, str]:
     """
     Run a single Claude iteration with the given prompt.
 
+    Args:
+        prompt: The prompt to send to Claude
+        progress_file: Path to the progress file
+        iteration: Current iteration number
+        model: Model to use for the invocation (default: "claude")
+        logger: Optional StructuredLogger for detailed logging
+
     Returns: (exit_code, output)
     """
-    cmd = ["claude", "--dangerously-skip-permissions", "--verbose", "-p", prompt]
+    cmd = [model, "--dangerously-skip-permissions", "--verbose", "-p", prompt]
+
+    # Log command execution start
+    if logger:
+        logger.log_command(cmd, output="", exit_code=0, duration=0.0,
+                          iteration=iteration, phase="start")
+
+    start_time = time.time()
 
     # Create temp file to capture output while also streaming it
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
@@ -400,8 +432,21 @@ def run_claude_iteration(prompt: str, progress_file: Path, iteration: int) -> tu
 
         process.wait()
         output = "".join(output_lines)
+        duration = time.time() - start_time
+
+        # Log command execution completion
+        if logger:
+            logger.log_command(cmd, output=output, exit_code=process.returncode,
+                              duration=duration, iteration=iteration)
 
         return process.returncode, output
+    except Exception as e:
+        duration = time.time() - start_time
+        # Log error
+        if logger:
+            logger.log_error("command_execution_error", str(e),
+                           command=cmd, iteration=iteration, duration=duration)
+        raise
     finally:
         # Clean up temp file
         try:
@@ -446,12 +491,26 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
     spec_file = Path(args.spec_file)
     max_iterations = args.max_iterations
     completion_promise = args.completion_promise
+    model = args.model
+    log_file = args.log_file
+
+    # Initialize logger if log file is specified
+    logger = None
+    if log_file:
+        try:
+            logger = StructuredLogger(log_file)
+            log("INIT", f"Logging enabled: {log_file}")
+        except Exception as e:
+            log("WARNING", f"Failed to initialize logger: {e}")
+            log("WARNING", "Continuing without logging")
 
     # Detect and validate spec format
     try:
         spec_format = detect_spec_format(spec_file)
     except ValueError as e:
         log("ERROR", str(e))
+        if logger:
+            logger.log_error("spec_format_error", str(e))
         return 1
 
     # Validate spec file
@@ -462,6 +521,8 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
             validate_markdown_spec(spec_file)
     except ValueError as e:
         log("ERROR", str(e))
+        if logger:
+            logger.log_error("spec_validation_error", str(e))
         return 1
 
     # Initialize progress file
@@ -469,6 +530,17 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
 
     spec_basename = spec_file.name
     spec_name = spec_file.stem
+
+    # Log configuration snapshot
+    if logger:
+        logger.log_configuration({
+            "spec_file": str(spec_file),
+            "spec_format": spec_format,
+            "max_iterations": max_iterations,
+            "completion_promise": completion_promise,
+            "model": model,
+            "log_file": log_file
+        })
 
     # Print header
     print("======================================")
@@ -480,6 +552,9 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
     print(f"Progress file:      {progress_file}")
     print(f"Max iterations:     {max_iterations}")
     print(f"Completion promise: {completion_promise}")
+    print(f"Model:              {model}")
+    if log_file:
+        print(f"Log file:           {log_file}")
     print()
 
     iteration = 0
@@ -488,6 +563,8 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
         # Check max iterations
         if max_iterations > 0 and iteration >= max_iterations:
             print(f"Max iterations ({max_iterations}) reached.")
+            if logger:
+                logger.log_event("max_iterations_reached", {"max_iterations": max_iterations})
             break
 
         iteration += 1
@@ -495,6 +572,10 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
         print("--------------------------------------")
         print(f"  Iteration {iteration} of {max_iterations}")
         print("--------------------------------------")
+
+        # Log iteration start
+        if logger:
+            logger.log_iteration_start(iteration, pending_tasks=None)
 
         # Check if all tasks are complete
         if spec_format == "json":
@@ -504,12 +585,18 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
 
         if pending == 0:
             print("All stories complete! Exiting loop.")
+            if logger:
+                logger.log_event("all_tasks_complete", {"iteration": iteration})
             break
 
         print(f"Pending stories: {pending}")
         print()
 
-        # Log iteration start
+        # Update pending count in iteration start log
+        if logger:
+            logger.log_event("pending_count", {"iteration": iteration, "pending": pending})
+
+        # Log iteration start to progress file
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open(progress_file, "a") as f:
             f.write(f"\n### Iteration {iteration} - {timestamp}\n")
@@ -520,24 +607,50 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
         else:
             prompt = generate_markdown_prompt(spec_basename, progress_file, completion_promise)
 
-        # Run Claude iteration
+        # Run Claude iteration with model and logger
         print("Running Claude...")
-        exit_code, output = run_claude_iteration(prompt, progress_file, iteration)
+        iteration_start = time.time()
+        try:
+            exit_code, output = run_claude_iteration(prompt, progress_file, iteration, model, logger)
+            iteration_duration = time.time() - iteration_start
 
-        if exit_code == 0:
-            print("Iteration completed successfully")
-            with open(progress_file, "a") as f:
-                f.write("Status: Completed\n")
+            if exit_code == 0:
+                print("Iteration completed successfully")
+                with open(progress_file, "a") as f:
+                    f.write("Status: Completed\n")
 
-            # Check for completion promise
-            if check_completion_promise(output, completion_promise):
-                print()
-                print(f"Completion promise detected: '{completion_promise}'")
-                break
-        else:
-            print("Iteration failed")
+                # Log iteration end
+                if logger:
+                    logger.log_iteration_end(iteration, success=True, duration=iteration_duration)
+
+                # Check for completion promise
+                if check_completion_promise(output, completion_promise):
+                    print()
+                    print(f"Completion promise detected: '{completion_promise}'")
+                    if logger:
+                        logger.log_event("completion_promise_detected",
+                                       {"iteration": iteration, "promise": completion_promise})
+                    break
+            else:
+                print("Iteration failed")
+                with open(progress_file, "a") as f:
+                    f.write("Status: Failed\n")
+
+                # Log iteration failure
+                if logger:
+                    logger.log_iteration_end(iteration, success=False, duration=iteration_duration,
+                                           exit_code=exit_code)
+        except Exception as e:
+            iteration_duration = time.time() - iteration_start
+            print(f"Exception during iteration: {e}")
             with open(progress_file, "a") as f:
-                f.write("Status: Failed\n")
+                f.write(f"Status: Exception - {e}\n")
+
+            # Log exception
+            if logger:
+                logger.log_error("iteration_exception", str(e), iteration=iteration,
+                               duration=iteration_duration)
+            raise
 
         # Commit any changes
         commit_changes(spec_name, iteration)
@@ -555,6 +668,15 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
         final_pending = check_json_completion(spec_file)
     else:
         final_pending = check_markdown_completion(spec_file)
+
+    # Close logger
+    if logger:
+        logger.log_event("ralph_loop_complete", {
+            "total_iterations": iteration,
+            "final_pending": final_pending,
+            "success": final_pending == 0
+        })
+        logger.close()
 
     if final_pending == 0:
         print("SUCCESS: All stories completed!")

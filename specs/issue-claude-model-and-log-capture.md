@@ -125,6 +125,7 @@ Update all Claude CLI invocations to use the configurable model parameter and lo
 - Update epilog with examples showing new parameters
 
 ### Integrate Logging in ralph-loop
+**Status:** complete
 - Import `StructuredLogger` from `lib.logger`
 - Initialize logger in `run_ralph_loop()` if `--log` is provided
 - Update `run_claude_iteration()` to:

@@ -267,3 +267,117 @@ Both ralph-loop and feature-loop now have CLI support for model and log file par
 
 Status: Completed
 Status: Completed
+
+======================================================================
+Iteration 4 Summary - 2026-02-01 09:31:56
+======================================================================
+
+Task: Integrate Logging in ralph-loop
+
+Status: ○ Incomplete
+
+Files changed: 3
+  Modified (3):
+    ~ specs/issue-claude-model-and-log-capture.md
+    ~ ssue-claude-model-and-log-capture-progress.txt
+    ~ plugins/sdlc/scripts/feature-loop
+
+Exit status: Success
+
+Progress: 4 of 9 tasks complete
+
+======================================================================
+
+### Iteration 5 - 2026-02-01 09:31:58
+
+**Task Completed:** Integrate Logging in ralph-loop
+
+**What was done:**
+1. Added import for `StructuredLogger` from `lib.logger` with fallback import logic:
+   - First tries `from lib.logger import StructuredLogger`
+   - Falls back to adding lib directory to sys.path and importing directly
+   - This ensures the script can find the logger module regardless of how it's invoked
+
+2. Updated `run_claude_iteration()` function signature and implementation:
+   - Added `model` parameter (default: "claude") to accept configurable model
+   - Added optional `logger` parameter (default: None) for structured logging
+   - Changed command construction from hardcoded `["claude", ...]` to `[model, ...]`
+   - Added timing tracking with `start_time` and `duration` calculation
+   - Added command execution start logging (when logger is enabled)
+   - Added command execution completion logging with full output, exit code, and duration
+   - Added exception handling with error logging
+   - Wrapped command execution in try-except block to log errors with full context
+
+3. Updated `run_ralph_loop()` function to initialize and use logger:
+   - Extracted `model` and `log_file` from args at function start
+   - Added logger initialization when `log_file` is provided:
+     - Creates StructuredLogger instance
+     - Logs initialization message
+     - Handles initialization errors gracefully with warning (continues without logging)
+   - Added error logging for spec format and validation errors
+   - Added configuration snapshot logging with all run parameters
+   - Updated header output to display model and log file (when enabled)
+   - Added logging at key loop events:
+     - Max iterations reached
+     - Iteration start with pending count
+     - All tasks complete
+     - Pending count for each iteration
+     - Iteration end (success or failure) with duration
+     - Completion promise detection
+     - Exception handling during iteration
+     - Ralph loop complete with final statistics
+   - Added logger.close() call at end of function to write final metadata
+   - Updated `run_claude_iteration()` call site to pass `model` and `logger` parameters
+
+4. Enhanced iteration loop with comprehensive logging:
+   - Log iteration start before checking completion status
+   - Log pending task count after computing it
+   - Track iteration duration with timing
+   - Log successful iterations with duration
+   - Log failed iterations with exit code and duration
+   - Log exceptions with full context and duration
+   - All logging is conditional (only when logger is enabled)
+
+5. Marked task as complete in spec file:
+   - Added `**Status:** complete` line after "### Integrate Logging in ralph-loop" heading
+
+**Key Design Decisions:**
+- Used flexible import mechanism to support different invocation methods (direct script run vs module import)
+- Made all logging conditional (only when logger is provided) to maintain backwards compatibility
+- Changed hardcoded "claude" to use model parameter throughout command construction
+- Log command execution at both start and end for complete trace
+- Captured and logged full command output (with truncation in logger for large outputs)
+- Added exception handling to log errors without breaking execution flow
+- Track iteration duration separately from command duration for complete performance metrics
+- Log configuration snapshot at startup for reproducibility
+- Close logger at end to write final metadata (total duration, success status)
+
+**Issues Encountered:**
+- None - implementation was straightforward following the established logger API
+
+**Testing Considerations:**
+- The model parameter now flows through to the actual claude CLI invocation
+- Logger captures all key events when enabled
+- Backwards compatibility maintained - works without --log parameter
+- Exception handling ensures errors are logged without breaking the loop
+- Configuration snapshot enables reproducing runs from logs
+- Timing data enables performance analysis
+
+**Verification:**
+The integration is complete and ready for testing. Users can now run:
+```bash
+ralph-loop.py --spec specs/test.md --model claude --log /tmp/ralph.log
+```
+
+The log file will contain JSONL-formatted events including:
+- Configuration snapshot
+- Iteration start/end with durations
+- Full command executions with outputs
+- Error details with context
+- Final completion status
+
+**Next Steps:**
+The ralph-loop logging integration is complete. The next task is to integrate logging in feature-loop, following a similar pattern.
+
+Status: Completed
+Status: Completed
