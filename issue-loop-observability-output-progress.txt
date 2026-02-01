@@ -126,3 +126,34 @@ Learnings:
 - Parsed data structure ready for formatting in Step 7
 
 Status: Completed
+
+### Iteration 3 - 2026-02-01 07:48:27
+
+### Step 7 - Add ACR summary formatting to feature-loop
+Status: Complete
+
+What was done:
+- Added `supports_color()` function to detect terminal color support (checks TTY, TERM, NO_COLOR)
+- Added color constants (GREEN, YELLOW, RED, BLUE, RESET) that respect color support
+- Added `format_separator()` function for visual dividers
+- Added `format_timestamp()` function for consistent timestamp formatting
+- Added `format_acr_summary()` function that takes parsed ACR data and returns formatted string with:
+  - Visual separator lines (===)
+  - Header: "Code Review Summary - Iteration N - [timestamp]"
+  - Total findings count (color-coded: green if 0, yellow if 1-5, red if >5)
+  - List of affected files with finding count per file (limited to first 10 files)
+  - Brief overview of finding categories (if available)
+  - Status: "LGTM ✓" or "Issues found - proceeding to triage"
+  - Visual separator line (===)
+
+Learnings:
+- Color support utilities similar to ralph-loop: TTY check, TERM check, NO_COLOR check
+- Color constants evaluated once at module load time based on supports_color()
+- Summary limits affected files to first 10 entries to keep output concise
+- Color coding strategy: green for LGTM, yellow for 1-5 findings, red for >5 findings
+- Finding count display handles "unknown" case when parsing doesn't detect specific count
+- Summary provides clear visual boundaries with separator lines for easy scanning
+- Function is ready to be integrated into review loop in Step 8
+
+Status: Completed
+Status: Completed

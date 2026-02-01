@@ -155,6 +155,7 @@ IMPORTANT: Execute every step in order, top to bottom.
 - Handle edge cases: empty output, malformed output, zero findings
 
 ### Step 7: Add ACR summary formatting to feature-loop
+**Status:** complete
 - Add `format_acr_summary()` function that takes parsed ACR data and returns formatted string:
   - Visual separator line (===)
   - Header: "Code Review Summary - Iteration N - [timestamp]"
