@@ -144,6 +144,7 @@ IMPORTANT: Execute every step in order, top to bottom.
 - Test with both Markdown and JSON spec formats
 
 ### Step 6: Add ACR output parsing utilities to feature-loop
+**Status:** complete
 - Add `parse_acr_output()` function that extracts:
   - Total findings count
   - List of files with issues (use regex to find file paths in output)

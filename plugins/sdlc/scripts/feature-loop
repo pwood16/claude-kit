@@ -467,6 +467,104 @@ def run_implement(plan_path: str, verbose: bool = False, max_iterations: int = 0
     log("IMPLEMENT", "Implementation phase complete")
 
 
+def parse_acr_output(review_output: str, exit_code: int) -> dict[str, Any]:
+    """
+    Parse ACR review output to extract structured findings data.
+
+    Args:
+        review_output: Raw output from acr command (stdout + stderr)
+        exit_code: Exit code from acr command (0=LGTM, 1=findings, 2=error)
+
+    Returns:
+        Dictionary with parsed data:
+        - total_findings: int count of findings
+        - files_with_issues: list of file paths that have issues
+        - findings_per_file: dict mapping file path to count
+        - finding_types: list of finding categories/types (if detectable)
+        - is_lgtm: bool, True if exit code 0
+        - raw_output: original output for fallback
+    """
+    parsed_data = {
+        "total_findings": 0,
+        "files_with_issues": [],
+        "findings_per_file": {},
+        "finding_types": [],
+        "is_lgtm": exit_code == 0,
+        "raw_output": review_output
+    }
+
+    # If LGTM, return early
+    if exit_code == 0:
+        return parsed_data
+
+    # Parse file paths from output
+    # Common patterns:
+    # - "path/to/file.py:123: finding description"
+    # - "path/to/file.py line 123: finding"
+    # - "File: path/to/file.py"
+    file_path_patterns = [
+        r'^([a-zA-Z0-9_./\-]+\.[a-zA-Z0-9]+):\d+:',  # file.py:123:
+        r'^([a-zA-Z0-9_./\-]+\.[a-zA-Z0-9]+)\s+line\s+\d+:',  # file.py line 123:
+        r'File:\s*([a-zA-Z0-9_./\-]+\.[a-zA-Z0-9]+)',  # File: file.py
+        r'^\s*([a-zA-Z0-9_./\-]+\.[a-zA-Z0-9]+)\s*$',  # file.py on its own line
+    ]
+
+    files_found = set()
+    file_finding_counts = {}
+
+    for line in review_output.split('\n'):
+        for pattern in file_path_patterns:
+            match = re.search(pattern, line, re.MULTILINE)
+            if match:
+                file_path = match.group(1)
+                files_found.add(file_path)
+                file_finding_counts[file_path] = file_finding_counts.get(file_path, 0) + 1
+                break
+
+    # Try to extract finding types/categories
+    # Look for common patterns like "Error:", "Warning:", "Security:", etc.
+    finding_type_patterns = [
+        r'(Error|Warning|Info|Security|Performance|Style|Bug|Critical):\s',
+        r'\[(Error|Warning|Info|Security|Performance|Style|Bug|Critical)\]',
+    ]
+
+    finding_types_found = set()
+    for line in review_output.split('\n'):
+        for pattern in finding_type_patterns:
+            match = re.search(pattern, line, re.IGNORECASE)
+            if match:
+                finding_types_found.add(match.group(1).capitalize())
+
+    # Estimate total findings
+    # Strategy: count lines that look like findings
+    # Heuristic: lines with file:line: pattern or starting with "- "
+    finding_line_patterns = [
+        r'^[a-zA-Z0-9_./\-]+\.[a-zA-Z0-9]+:\d+:',  # file.py:123:
+        r'^\s*-\s+\w',  # - Finding description
+        r'^\s*\d+\.\s+\w',  # 1. Finding description
+    ]
+
+    finding_count = 0
+    for line in review_output.split('\n'):
+        for pattern in finding_line_patterns:
+            if re.match(pattern, line):
+                finding_count += 1
+                break
+
+    # If no findings detected via patterns but exit code is 1, set to unknown
+    if finding_count == 0 and exit_code == 1:
+        # Check if output contains words like "finding", "issue", "problem"
+        if re.search(r'\b(finding|issue|problem|error|warning)s?\b', review_output, re.IGNORECASE):
+            finding_count = len(files_found) if files_found else 1
+
+    parsed_data["total_findings"] = finding_count
+    parsed_data["files_with_issues"] = sorted(list(files_found))
+    parsed_data["findings_per_file"] = file_finding_counts
+    parsed_data["finding_types"] = sorted(list(finding_types_found))
+
+    return parsed_data
+
+
 def run_review(verbose: bool = False, num_reviewers: int = 0) -> tuple[int, str]:
     """
     Run acr --local to perform code review.

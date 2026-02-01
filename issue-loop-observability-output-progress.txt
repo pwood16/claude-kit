@@ -99,3 +99,30 @@ Next Steps:
 - Steps 11-12: Progress file logging and documentation updates
 - Steps 13-15: Testing and validation
 Status: Completed
+
+### Iteration 2 - 2026-02-01 07:46:58
+
+### Step 6 - Add ACR output parsing utilities to feature-loop
+Status: Complete
+
+What was done:
+- Added `parse_acr_output()` function to feature-loop script (after run_implement(), before run_review())
+- Function takes review output and exit code, returns structured dictionary with parsed data
+- Parsing logic extracts:
+  - Total findings count (using multiple heuristics: file:line patterns, bullet points, numbered lists)
+  - Files with issues (using regex patterns for common file path formats)
+  - Findings per file (count of findings in each file)
+  - Finding types/categories (Error, Warning, Security, etc. via regex)
+  - LGTM status (based on exit code 0)
+- Defensive parsing: handles empty output, malformed output, zero findings gracefully
+- Returns structured dict for use in summary formatting (Step 7)
+
+Learnings:
+- ACR output format varies, so used multiple regex patterns to capture different formats
+- File path patterns: "file.py:123:", "file.py line 123:", "File: file.py"
+- Finding count heuristics: count lines matching finding patterns, fallback to file count if exit code 1
+- Finding types detected via "Error:", "Warning:", "[Security]", etc.
+- Function is defensive: if no patterns match but exit code is 1, estimates at least 1 finding
+- Parsed data structure ready for formatting in Step 7
+
+Status: Completed
