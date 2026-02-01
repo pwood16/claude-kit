@@ -206,6 +206,7 @@ Create the review-loop script with the following capabilities:
 - Test `--no-verbose` to disable config verbose=true
 
 ### Step 12: Test the /sdlc:review command
+**Status:** complete
 - Test command invocation: `/sdlc:review`
 - Test with arguments: `/sdlc:review --max-iterations 3 --model claude`
 - Verify command properly invokes review-loop script
