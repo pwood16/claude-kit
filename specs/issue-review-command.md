@@ -134,6 +134,7 @@ Create the review-loop script with the following capabilities:
 - Log triage results
 
 ### Step 5: Implement the main review loop
+**Status:** complete
 - Create `main()` function that:
   - Parses arguments and loads configuration
   - Validates ACR CLI is available

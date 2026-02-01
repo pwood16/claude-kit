@@ -671,13 +671,64 @@ def main() -> int:
     if verbose:
         log("CONFIG", "Configuration loading complete")
 
-    # TODO: Implement review execution
-    # TODO: Implement triage logic
-    # TODO: Implement main review loop
-    # TODO: Implement logging
+    # Validate ACR CLI is available
+    if not check_command_exists("acr"):
+        log("ERROR", "ACR command not found. Please install ACR to use this tool.")
+        log("ERROR", "Visit https://github.com/anthropics/acr for installation instructions.")
+        return 1
 
-    print("Review loop implementation in progress...")
-    return 0
+    log("INIT", f"Starting review loop (max {max_iterations} iterations)")
+    print()
+
+    # Run the review loop
+    for iteration in range(1, max_iterations + 1):
+        log("LOOP", f"Starting iteration {iteration}/{max_iterations}")
+        print()
+
+        # Run ACR review
+        exit_code, review_output = run_review(verbose=verbose, num_reviewers=num_reviewers)
+
+        # Parse and display summary
+        parsed_data = parse_acr_output(review_output, exit_code)
+        summary = format_acr_summary(parsed_data, iteration)
+        print(summary)
+        print()
+
+        # Check exit code
+        if exit_code == 0:
+            # LGTM - code passed review!
+            log("SUCCESS", "Code review passed - LGTM!")
+            log("SUCCESS", f"Review completed successfully in {iteration} iteration(s)")
+            return 0
+
+        elif exit_code == 1:
+            # Findings found - triage and fix
+            log("TRIAGE", "Issues found - beginning triage and fixes...")
+            print()
+
+            triage_and_fix_issues(review_output, verbose=verbose, model=model)
+            print()
+
+            # Continue to next iteration
+            if iteration < max_iterations:
+                log("LOOP", f"Triage complete, proceeding to iteration {iteration + 1}")
+                print()
+            else:
+                log("WARNING", "Max iterations reached - some issues may remain")
+                log("WARNING", "Consider reviewing manually or running with --max-iterations N")
+                return 1
+
+        else:
+            # Error in ACR execution
+            log("ERROR", f"ACR error (exit code {exit_code})")
+            log("ERROR", "Review output:")
+            print(review_output)
+            return exit_code
+
+    # Max iterations reached
+    log("WARNING", f"Max iterations ({max_iterations}) reached without LGTM")
+    log("WARNING", "Consider reviewing remaining issues manually or increasing --max-iterations")
+    return 1
 
 
 if __name__ == "__main__":

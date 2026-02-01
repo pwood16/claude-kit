@@ -218,3 +218,68 @@ None. Successfully copied and adapted the function from feature-loop.
 
 Status: Completed
 Status: Completed
+
+======================================================================
+Iteration 4 Summary - 2026-02-01 10:15:14
+======================================================================
+
+Task: Step 5: Implement the main review loop
+
+Status: ○ Incomplete
+
+Files changed: 3
+  Modified (3):
+    ~ ssue-review-command-progress.txt
+    ~ plugins/sdlc/scripts/review-loop
+    ~ specs/issue-review-command.md
+
+Exit status: Success
+
+Progress: 4 of 15 tasks complete
+
+======================================================================
+
+### Iteration 5 - 2026-02-01 10:15:16
+
+**Task Completed:** Step 5 - Implement the main review loop
+
+**What was done:**
+- Implemented the main review loop in the main() function
+- Replaced TODO placeholders with complete implementation:
+  - ACR CLI validation (checks if acr command exists)
+  - Initialization logging with configuration summary
+  - Main iteration loop (1 to max_iterations):
+    - Runs ACR review with run_review()
+    - Parses output with parse_acr_output()
+    - Displays summary with format_acr_summary()
+    - Handles three exit code scenarios:
+      - exit_code 0 (LGTM): Success, exit immediately
+      - exit_code 1 (findings): Run triage_and_fix_issues() and continue
+      - exit_code >= 2 (error): Display error and exit with error code
+  - Max iterations handling: warns user and returns exit code 1
+  - Clean error messages for all failure scenarios
+- Added proper logging statements throughout the loop
+- Return appropriate exit codes for success (0) and failure (1 or ACR error code)
+- Marked Step 5 as complete in spec
+
+**Learnings:**
+- The review loop follows a clean pattern: review → parse → display → triage → repeat
+- Exit code 0 from ACR means LGTM and loop should terminate successfully
+- Exit code 1 means findings were found and need triage
+- Exit code >= 2 indicates an error in ACR execution
+- Each iteration displays a full summary before triage begins
+- Triage errors don't halt the loop - it continues and retries review
+- The loop exits early on LGTM (doesn't waste iterations)
+- Max iterations reached is treated as a warning, not a hard error
+- The function returns proper exit codes for shell integration
+- Verbose logging shows configuration and command execution details
+- The loop structure matches the review phase in feature-loop for consistency
+
+**Issues encountered:**
+None. Step completed successfully.
+
+**Next steps:**
+- Step 6: Add logging support
+
+Status: Completed
+Status: Completed
