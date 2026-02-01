@@ -1063,6 +1063,13 @@ Configuration:
 
             exit_code, review_output = run_review(args.verbose, args.num_reviewers)
 
+            # Parse and display ACR summary
+            parsed_acr_data = parse_acr_output(review_output, exit_code)
+            acr_summary = format_acr_summary(parsed_acr_data, iteration)
+            print()
+            print(acr_summary)
+            print()
+
             if exit_code == 0:
                 # LGTM - no issues found
                 log("LOOP", "Code review passed!")

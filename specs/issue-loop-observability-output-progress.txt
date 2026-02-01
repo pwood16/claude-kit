@@ -24,3 +24,31 @@
 - Use Unicode symbols (✓, ○, !) for better visual scanning
 
 **Status:** Complete - All formatting utilities are in place and ready to be used by iteration summary generation
+### Iteration 4 - 2026-02-01
+
+**Task:** Step 8: Display ACR summaries in feature-loop review loop
+
+**What was done:**
+- Integrated ACR summary display into the feature-loop review loop
+- Modified the review iteration loop in feature-loop script (lines 1061-1089)
+- After `run_review()` returns (line 1064), added:
+  1. Call to `parse_acr_output()` to parse the review output and exit code
+  2. Call to `format_acr_summary()` to generate formatted summary
+  3. Print the summary to stdout with blank lines for readability
+- Summary now appears before the conditional logic that handles LGTM/findings/errors
+- When exit code is 0 (LGTM), summary shows success with green checkmark
+- When exit code is 1 (findings), summary shows issues before triage begins
+- When exit code is 2+ (error), the existing error handling still applies after summary
+
+**Key decisions:**
+- Display summary immediately after review completes, before any triage or branching logic
+- Use existing utility functions (parse_acr_output and format_acr_summary) from Steps 6 and 7
+- Add blank lines before and after summary for visual separation from other output
+- Summary provides clear visual feedback about review results before proceeding to triage
+
+**Verification:**
+- Python syntax check passed (py_compile successful)
+- Integration point confirmed at correct location in review loop
+- Summary will display for all exit codes (LGTM, findings, and errors)
+
+**Status:** Complete - ACR summaries now display after each review iteration in feature-loop

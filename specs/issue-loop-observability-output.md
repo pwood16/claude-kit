@@ -167,6 +167,7 @@ IMPORTANT: Execute every step in order, top to bottom.
 - Add color support utilities similar to ralph-loop
 
 ### Step 8: Display ACR summaries in feature-loop review loop
+**Status:** complete
 - In the review loop (lines 830-864), after `run_review()` returns (line ~833):
   - Parse the review output with `parse_acr_output()`
   - Generate summary with `format_acr_summary()`
