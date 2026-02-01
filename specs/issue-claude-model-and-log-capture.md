@@ -168,6 +168,7 @@ Update all Claude CLI invocations to use the configurable model parameter and lo
 - Add `.claude-kit.example` file at repo root with all new options documented
 
 ### Run Validation Commands
+**Status:** complete
 Execute all validation commands to ensure the feature works correctly with zero regressions.
 
 ## Testing Strategy

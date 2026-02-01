@@ -1,0 +1,110 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = []
+# ///
+"""
+review-loop - Automated code review and triage loop.
+
+This script runs an iterative code review loop:
+1. Run ACR (Automated Code Review) with specified configuration
+2. Parse findings from ACR output
+3. Display structured review summary
+4. Invoke Claude to diagnose findings (real issues vs false positives)
+5. Fix real issues and add explanatory comments for false positives
+6. Repeat until LGTM or max iterations reached
+
+Usage:
+    review-loop
+    review-loop --max-iterations 3
+    review-loop --num-reviewers 5 --model claude --verbose
+    review-loop --log review-output.log
+"""
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Optional
+
+
+def parse_arguments() -> argparse.Namespace:
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Run automated code review loop with ACR",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s
+  %(prog)s --max-iterations 3
+  %(prog)s --num-reviewers 5 --model claude
+  %(prog)s --verbose --log review.log
+        """
+    )
+
+    parser.add_argument(
+        "--max-iterations", "-m",
+        type=int,
+        default=5,
+        help="Maximum review/fix cycles (default: 5)"
+    )
+
+    parser.add_argument(
+        "--num-reviewers", "-r",
+        type=int,
+        default=5,
+        help="Number of ACR reviewers (default: 5)"
+    )
+
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="claude",
+        help="Model to use for triage (default: claude)"
+    )
+
+    parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Enable verbose logging"
+    )
+
+    parser.add_argument(
+        "--log", "--log-file",
+        type=str,
+        dest="log_file",
+        help="Path to log file for detailed execution capture"
+    )
+
+    return parser.parse_args()
+
+
+def main() -> int:
+    """Main entry point for review-loop."""
+    args = parse_arguments()
+
+    print(f"Review Loop Configuration:")
+    print(f"  Max iterations: {args.max_iterations}")
+    print(f"  Number of reviewers: {args.num_reviewers}")
+    print(f"  Model: {args.model}")
+    print(f"  Verbose: {args.verbose}")
+    if args.log_file:
+        print(f"  Log file: {args.log_file}")
+    print()
+
+    # TODO: Implement configuration loading
+    # TODO: Implement review execution
+    # TODO: Implement triage logic
+    # TODO: Implement main review loop
+    # TODO: Implement logging
+
+    print("Review loop implementation in progress...")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

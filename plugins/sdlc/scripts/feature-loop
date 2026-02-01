@@ -85,12 +85,19 @@ def log(step: str, message: str) -> None:
     print(f"[{timestamp}] [{step}] {message}", flush=True)
 
 
-def run_command(cmd: list[str], capture_output: bool = True) -> subprocess.CompletedProcess:
-    """Run a command and return the result."""
+def run_command(cmd: list[str], capture_output: bool = True, interactive: bool = False) -> subprocess.CompletedProcess:
+    """Run a command and return the result.
+
+    Args:
+        cmd: Command and arguments to run
+        capture_output: If True, capture stdout/stderr. If False, show output in terminal.
+        interactive: If True, allow stdin from terminal. If False, detach stdin to prevent prompts.
+    """
+    stdin = None if interactive else subprocess.DEVNULL
     if capture_output:
-        return subprocess.run(cmd, capture_output=True, text=True)
+        return subprocess.run(cmd, capture_output=True, text=True, stdin=stdin)
     else:
-        return subprocess.run(cmd, text=True)
+        return subprocess.run(cmd, text=True, stdin=stdin)
 
 
 def check_command_exists(cmd: str) -> bool:
@@ -1405,7 +1412,7 @@ Configuration:
 
     # Log configuration snapshot
     if logger:
-        logger.log_config({
+        logger.log_configuration({
             "feature_prompt": feature_prompt,
             "model": args.model,
             "max_implement_iterations": args.max_implement_iterations,

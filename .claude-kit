@@ -1,11 +1,1 @@
-{
-  "feature_loop": {
-    "max_implement_iterations": 0,
-    "max_review_iterations": 5,
-    "skip_review": false,
-    "verbose": false
-  },
-  "acr": {
-    "num_reviewers": 5
-  }
-}
+{"ralph_loop": {"model": "config-model"}}
