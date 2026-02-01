@@ -160,3 +160,61 @@ None. Step completed successfully by direct code reuse from feature-loop.
 
 Status: Completed
 Status: Completed
+
+======================================================================
+Iteration 3 Summary - 2026-02-01 10:14:11
+======================================================================
+
+Task: Step 4: Implement triage logic
+
+Status: ○ Incomplete
+
+Files changed: 3
+  Modified (3):
+    ~ ssue-review-command-progress.txt
+    ~ plugins/sdlc/scripts/review-loop
+    ~ specs/issue-review-command.md
+
+Exit status: Success
+
+Progress: 3 of 15 tasks complete
+
+======================================================================
+
+### Iteration 4 - 2026-02-01 10:14:13
+
+**Task Completed:** Step 4 - Implement triage logic
+
+**What was done:**
+- Copied `triage_and_fix_issues()` function from feature-loop (lines 1096-1173)
+- Adapted the function signature to remove the optional logger parameter
+- Simplified the function since review-loop doesn't use execution logger
+- The function invokes Claude with a triage prompt that:
+  - Analyzes each finding to determine if it's a real issue or false positive
+  - Fixes real issues with minimal code changes
+  - Adds explanatory comments for false positives
+- Added timing information for triage operations
+- Function uses the model parameter passed from configuration/CLI
+- Handles errors gracefully by logging but not exiting (allows loop to continue)
+- Tested Python syntax validation
+
+**Learnings:**
+- The triage prompt is comprehensive and guides Claude to:
+  - Diagnose each finding independently
+  - Make minimal fixes for real issues
+  - Add clear comments (using appropriate syntax) for false positives
+  - Document decisions in the output
+- The function uses --dangerously-skip-permissions to avoid permission prompts
+- Triage errors don't halt the loop - it continues and tries review again
+- Timing information helps understand performance characteristics
+- The prompt instructs to use file-type-appropriate comment syntax
+- The function doesn't modify return values, it just performs side effects (fixes code)
+
+**Issues encountered:**
+None. Successfully copied and adapted the function from feature-loop.
+
+**Next steps:**
+- Step 5: Implement the main review loop
+
+Status: Completed
+Status: Completed

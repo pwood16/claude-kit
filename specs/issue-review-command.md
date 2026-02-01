@@ -127,6 +127,7 @@ Create the review-loop script with the following capabilities:
   - `format_separator()` and `format_timestamp()` utilities
 
 ### Step 4: Implement triage logic
+**Status:** complete
 - Copy `triage_and_fix_issues()` function from feature-loop
 - Ensure it properly invokes Claude with the diagnostic prompt
 - Handle both real issues (fix code) and false positives (add comments)
