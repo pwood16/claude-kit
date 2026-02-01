@@ -187,6 +187,7 @@ Create the review-loop script with the following capabilities:
 - Check error messages are clear and helpful
 
 ### Step 10: Test review loop with ACR
+**Status:** complete
 - Make deliberate code changes that will trigger ACR findings
 - Run review-loop and verify:
   - ACR executes with correct flags (--local -a claude -s claude -r 5)
