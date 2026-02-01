@@ -100,6 +100,7 @@ Update all Claude CLI invocations to use the configurable model parameter and lo
 - Add type hints for new configuration fields in TypedDict definitions
 
 ### Update ralph-loop CLI Arguments
+**Status:** complete
 - Add `--model` argument to `parse_arguments()` (after line 79):
   - Type: `str`
   - Default: `"claude"`

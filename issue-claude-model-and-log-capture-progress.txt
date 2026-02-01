@@ -125,3 +125,75 @@ The configuration system now supports model selection for both feature-loop and 
 
 Status: Completed
 Status: Completed
+
+======================================================================
+Iteration 2 Summary - 2026-02-01 09:29:42
+======================================================================
+
+Task: Update ralph-loop CLI Arguments
+
+Status: ○ Incomplete
+
+Files changed: 4
+  Modified (4):
+    ~ issue-claude-model-and-log-capture-progress.txt
+    ~ claude-kit.example
+    ~ specs/issue-claude-model-and-log-capture.md
+    ~ plugins/sdlc/scripts/feature-loop
+
+Exit status: Success
+
+Progress: 2 of 9 tasks complete
+
+======================================================================
+
+### Iteration 3 - 2026-02-01 09:29:44
+
+**Task Completed:** Update ralph-loop CLI Arguments
+
+**What was done:**
+1. Added `--model` argument to `parse_arguments()` function in `plugins/spawn/scripts/ralph-loop.py`:
+   - Type: str
+   - Default: "claude"
+   - Help text: "Model to use for agent invocations (default: claude)"
+   - Positioned after the `--completion-promise` argument
+
+2. Added `--log` / `--log-file` argument to `parse_arguments()`:
+   - Accepts both `--log` and `--log-file` as aliases (using dest="log_file")
+   - Type: str
+   - Default: None (optional parameter)
+   - Help text: "Path to log file for detailed execution capture (optional)"
+   - This allows users to optionally capture detailed logs for debugging
+
+3. Updated the module docstring to include the new parameters in the usage section:
+   - Added `[--model MODEL]` and `[--log FILE]` to usage line
+   - Added example showing both new parameters: `ralph-loop --spec specs/feature.md --model claude --log /tmp/ralph.log`
+
+4. Updated the argument parser's epilog with the new example:
+   - Added the same comprehensive example to the epilog section
+   - Maintains consistency between docstring and help output
+
+5. Updated spec file to mark task as complete:
+   - Added `**Status:** complete` line after "### Update ralph-loop CLI Arguments" heading
+
+**Key Design Decisions:**
+- Used both `--log` and `--log-file` as aliases to provide flexibility for users (some prefer shorter flags, others prefer explicit names)
+- Set model default to "claude" to maintain backwards compatibility - existing scripts will work without modification
+- Made log file optional (default None) so logging is opt-in only when needed
+- Positioned new arguments after existing ones to maintain backwards compatibility in any scripts that use positional-style arg construction
+- Used clear, descriptive help text for both arguments
+
+**Issues Encountered:**
+- None - implementation was straightforward
+
+**Testing Considerations:**
+- The new arguments are now available in the CLI interface
+- Users can run `ralph-loop.py --help` to see the new parameters
+- The arguments will be accessible via `args.model` and `args.log_file` in the script
+- Still need to integrate these parameters into the actual execution logic in subsequent tasks
+
+**Next Steps:**
+The ralph-loop CLI now accepts model and log file parameters. The next task is to update feature-loop CLI arguments with the same parameters, followed by integrating these parameters into the actual execution logic of both scripts.
+
+Status: Completed
+Status: Completed

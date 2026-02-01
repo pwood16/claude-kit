@@ -14,13 +14,14 @@ Supports two spec formats:
 Exits when: all tasks complete, max-iterations reached, or completion promise detected.
 
 Usage:
-    ralph-loop --spec <file> [--max-iterations N] [--completion-promise TEXT]
+    ralph-loop --spec <file> [--max-iterations N] [--model MODEL] [--log FILE]
     ralph-loop --prd <file> [--max-iterations N] [--completion-promise TEXT]  (legacy JSON format)
 
 Examples:
     ralph-loop --spec specs/feature.md
     ralph-loop --spec specs/feature.json --max-iterations 10
     ralph-loop --prd legacy.json --completion-promise "ALL DONE"
+    ralph-loop --spec specs/feature.md --model claude --log /tmp/ralph.log
 """
 
 import argparse
@@ -55,6 +56,7 @@ Examples:
     %(prog)s --spec specs/feature.md
     %(prog)s --spec specs/feature.json --max-iterations 10
     %(prog)s --prd legacy.json --completion-promise "ALL DONE"
+    %(prog)s --spec specs/feature.md --model claude --log /tmp/ralph.log
         """
     )
 
@@ -81,6 +83,20 @@ Examples:
         "--completion-promise",
         default="TASK COMPLETE",
         help='String to detect completion (default: "TASK COMPLETE")'
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="claude",
+        help="Model to use for agent invocations (default: claude)"
+    )
+    parser.add_argument(
+        "--log",
+        "--log-file",
+        dest="log_file",
+        type=str,
+        default=None,
+        help="Path to log file for detailed execution capture (optional)"
     )
 
     args = parser.parse_args()
