@@ -82,6 +82,7 @@ Update all Claude CLI invocations to use the configurable model parameter and lo
 - Create symlink or copy logger to `plugins/sdlc/lib/logger.py`
 
 ### Extend Configuration System
+**Status:** complete
 - Update `.claude-kit` example documentation with new `model` field:
   ```json
   {

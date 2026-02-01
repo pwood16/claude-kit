@@ -44,6 +44,25 @@ class CheckpointState(TypedDict):
     review_iteration: int  # Current review iteration, 0 if not in review
     started_at: str  # ISO timestamp
     updated_at: str  # ISO timestamp
+
+
+class FeatureLoopConfig(TypedDict, total=False):
+    """Configuration structure for feature_loop section in .claude-kit."""
+    model: str  # Model to use for agent invocations (default: "claude")
+    max_implement_iterations: int  # Max implementation iterations (0 = unlimited)
+    max_review_iterations: int  # Max review iterations
+    skip_review: bool  # Skip review phase
+    verbose: bool  # Enable verbose logging
+
+
+class RalphLoopConfig(TypedDict, total=False):
+    """Configuration structure for ralph_loop section in .claude-kit."""
+    model: str  # Model to use for agent invocations (default: "claude")
+
+
+class ACRConfig(TypedDict, total=False):
+    """Configuration structure for acr section in .claude-kit."""
+    num_reviewers: int  # Number of reviewers for ACR (0 = use acr default)
     config: dict[str, Any]  # Snapshot of configuration used
 
 
@@ -164,14 +183,15 @@ def merge_configs(configs: list[dict[str, Any]]) -> dict[str, Any]:
     return result
 
 
-def validate_config(config: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+def validate_config(config: dict[str, Any]) -> tuple[FeatureLoopConfig, ACRConfig, RalphLoopConfig]:
     """
     Validate configuration values and return validated settings.
 
-    Returns a tuple of (feature_loop_config, acr_config) or exits on validation error.
+    Returns a tuple of (feature_loop_config, acr_config, ralph_loop_config) or exits on validation error.
     """
     feature_loop_config = config.get("feature_loop", {})
     acr_config = config.get("acr", {})
+    ralph_loop_config = config.get("ralph_loop", {})
 
     # Validate that feature_loop is a dict/object, not array or other type
     if not isinstance(feature_loop_config, dict):
@@ -181,6 +201,11 @@ def validate_config(config: dict[str, Any]) -> tuple[dict[str, Any], dict[str, A
     # Validate that acr is a dict/object, not array or other type
     if not isinstance(acr_config, dict):
         log("ERROR", f"acr config must be a JSON object (dict), got: {type(acr_config).__name__}")
+        sys.exit(1)
+
+    # Validate that ralph_loop is a dict/object, not array or other type
+    if not isinstance(ralph_loop_config, dict):
+        log("ERROR", f"ralph_loop config must be a JSON object (dict), got: {type(ralph_loop_config).__name__}")
         sys.exit(1)
 
     # Validate max_review_iterations
@@ -211,6 +236,20 @@ def validate_config(config: dict[str, Any]) -> tuple[dict[str, Any], dict[str, A
             log("ERROR", f"max_implement_iterations must be a non-negative integer, got: {value}")
             sys.exit(1)
 
+    # Validate model
+    if "model" in feature_loop_config:
+        value = feature_loop_config["model"]
+        if not isinstance(value, str) or not value.strip():
+            log("ERROR", f"feature_loop.model must be a non-empty string, got: {value}")
+            sys.exit(1)
+
+    # Validate ralph_loop.model
+    if "model" in ralph_loop_config:
+        value = ralph_loop_config["model"]
+        if not isinstance(value, str) or not value.strip():
+            log("ERROR", f"ralph_loop.model must be a non-empty string, got: {value}")
+            sys.exit(1)
+
     # Validate acr.num_reviewers
     if "num_reviewers" in acr_config:
         value = acr_config["num_reviewers"]
@@ -218,14 +257,14 @@ def validate_config(config: dict[str, Any]) -> tuple[dict[str, Any], dict[str, A
             log("ERROR", f"acr.num_reviewers must be a positive integer, got: {value}")
             sys.exit(1)
 
-    return feature_loop_config, acr_config
+    return feature_loop_config, acr_config, ralph_loop_config
 
 
-def load_configuration(verbose: bool = False) -> tuple[dict[str, Any], dict[str, Any]]:
+def load_configuration(verbose: bool = False) -> tuple[FeatureLoopConfig, ACRConfig, RalphLoopConfig]:
     """
     Load and merge configuration from all discovered config files.
 
-    Returns a tuple of (feature_loop_config, acr_config).
+    Returns a tuple of (feature_loop_config, acr_config, ralph_loop_config).
     Precedence: defaults < user home < git root < current dir < CLI args
     """
     config_files = discover_config_files(verbose)
@@ -240,9 +279,9 @@ def load_configuration(verbose: bool = False) -> tuple[dict[str, Any], dict[str,
     merged_config = merge_configs(configs)
 
     # Validate and extract settings
-    feature_loop_config, acr_config = validate_config(merged_config)
+    feature_loop_config, acr_config, ralph_loop_config = validate_config(merged_config)
 
-    return feature_loop_config, acr_config
+    return feature_loop_config, acr_config, ralph_loop_config
 
 
 def get_state_file_path(feature_prompt: str = "") -> Path:
@@ -1039,9 +1078,10 @@ def main() -> None:
     pre_args, _ = pre_parser.parse_known_args()
 
     # Load configuration from files
-    feature_loop_config, acr_config = load_configuration(verbose=pre_args.verbose)
+    feature_loop_config, acr_config, ralph_loop_config = load_configuration(verbose=pre_args.verbose)
 
     # Get defaults from config (fallback to hardcoded defaults)
+    default_model = feature_loop_config.get("model", "claude")
     default_max_iterations = feature_loop_config.get("max_review_iterations", 5)
     default_max_implement_iterations = feature_loop_config.get("max_implement_iterations", 0)  # 0 = unlimited
     default_skip_review = feature_loop_config.get("skip_review", False)
@@ -1049,7 +1089,8 @@ def main() -> None:
     default_num_reviewers = acr_config.get("num_reviewers", 0)  # 0 = use acr default
 
     if default_verbose and (feature_loop_config or acr_config):
-        log("CONFIG", f"Using configuration: max_review_iterations={default_max_iterations}, "
+        log("CONFIG", f"Using configuration: model={default_model}, "
+                     f"max_review_iterations={default_max_iterations}, "
                      f"max_implement_iterations={default_max_implement_iterations}, "
                      f"skip_review={default_skip_review}, verbose={default_verbose}, "
                      f"acr.num_reviewers={default_num_reviewers}")

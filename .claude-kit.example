@@ -1,9 +1,13 @@
 {
   "feature_loop": {
+    "model": "claude",
     "max_implement_iterations": 0,
     "max_review_iterations": 5,
     "skip_review": false,
     "verbose": false
+  },
+  "ralph_loop": {
+    "model": "claude"
   },
   "acr": {
     "num_reviewers": 5

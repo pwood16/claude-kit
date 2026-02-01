@@ -48,3 +48,80 @@
 **Next Steps:**
 The logging infrastructure is now complete and ready to be integrated into ralph-loop and feature-loop scripts. The next task is to extend the configuration system to support the model parameter.
 Status: Completed
+
+======================================================================
+Iteration 1 Summary - 2026-02-01 09:26:50
+======================================================================
+
+Task: Extend Configuration System
+
+Status: ○ Incomplete
+
+Files changed: 9
+  Modified (9):
+    ~ specs/issue-simple-test-function.md
+    ~ feature-loop-state.json
+    ~ issue-loop-observability-output-progress.txt
+    ~ test-observability-spec-progress.txt
+    ~ plugins/spawn/scripts/ralph-loop
+    ... and 4 more
+
+Exit status: Success
+
+Progress: 1 of 9 tasks complete
+
+======================================================================
+
+### Iteration 2 - 2026-02-01 09:26:52
+
+**Task Completed:** Extend Configuration System
+
+**What was done:**
+1. Updated `.claude-kit.example` file to include model field in both `feature_loop` and `ralph_loop` sections:
+   - Added `"model": "claude"` to feature_loop configuration
+   - Added new `ralph_loop` section with `"model": "claude"` field
+   - This provides clear documentation for users on how to configure model selection
+
+2. Extended feature-loop configuration validation in `plugins/sdlc/scripts/feature-loop`:
+   - Added validation for `feature_loop.model` field (must be non-empty string)
+   - Added validation for `ralph_loop.model` field (must be non-empty string)
+   - Updated `validate_config()` to return three-tuple: (feature_loop_config, acr_config, ralph_loop_config)
+   - Added validation for ralph_loop config section as dict type
+
+3. Updated configuration loading in feature-loop:
+   - Modified `load_configuration()` to return ralph_loop_config as third tuple element
+   - Updated main() to extract `default_model` from feature_loop_config with fallback to "claude"
+   - Updated verbose logging to include model configuration
+   - Updated all call sites to handle three-tuple return value
+
+4. Added comprehensive TypedDict type hints:
+   - Created `FeatureLoopConfig` TypedDict with fields: model, max_implement_iterations, max_review_iterations, skip_review, verbose
+   - Created `RalphLoopConfig` TypedDict with field: model
+   - Created `ACRConfig` TypedDict with field: num_reviewers
+   - Used `total=False` to make all fields optional (supporting partial configs)
+   - Updated function signatures for `validate_config()` and `load_configuration()` to use these types
+
+5. Updated spec file to mark task as complete:
+   - Added `**Status:** complete` line after "### Extend Configuration System" heading
+
+**Key Design Decisions:**
+- Used `total=False` in TypedDict definitions to allow partial configurations (all fields optional)
+- Maintained backwards compatibility by keeping "claude" as the default model when not configured
+- Added validation to ensure model values are non-empty strings (prevents configuration errors)
+- Separated ralph_loop config as its own section (not nested under feature_loop) for clarity
+- Made ralph_loop_config available throughout feature-loop for future integration with ralph-loop invocations
+
+**Issues Encountered:**
+- None - implementation was straightforward
+
+**Testing Considerations:**
+- Configuration loading should now properly parse and validate model fields
+- Type hints will help catch configuration errors at development time
+- Defaults ensure backwards compatibility when model is not specified
+- Validation prevents empty or invalid model strings
+
+**Next Steps:**
+The configuration system now supports model selection for both feature-loop and ralph-loop. The next task is to update ralph-loop CLI arguments to accept --model and --log parameters.
+
+Status: Completed
+Status: Completed
