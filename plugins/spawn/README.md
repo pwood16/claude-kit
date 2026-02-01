@@ -263,12 +263,23 @@ The `ralph-loop` script can also be used standalone (outside of `/spawn:wt-agent
 
 # With custom completion promise
 ./plugins/spawn/scripts/ralph-loop --spec specs/feature.md --completion-promise "ALL DONE"
+
+# With specific model (e.g., claude-3-opus, claude-3-sonnet)
+./plugins/spawn/scripts/ralph-loop --spec specs/feature.md --model claude
+
+# With detailed logging for debugging
+./plugins/spawn/scripts/ralph-loop --spec specs/feature.md --log /tmp/ralph.log
+
+# Combined usage
+./plugins/spawn/scripts/ralph-loop --spec specs/feature.md --model claude --log /tmp/ralph.log --max-iterations 10
 ```
 
 **Options:**
 - `--spec FILE` or `--prd FILE`: Path to spec file (required)
 - `--max-iterations N`: Maximum iterations before stopping (default: 0 = unlimited)
 - `--completion-promise TEXT`: String that signals completion (default: "TASK COMPLETE")
+- `--model MODEL`: Model to use for agent invocations (default: "claude")
+- `--log FILE` or `--log-file FILE`: Path to log file for detailed execution capture (optional)
 - `--summary-only`: Show only iteration summaries, suppress verbose Claude output
 - `--no-summaries`: Disable iteration summaries (for backwards compatibility)
 
@@ -319,3 +330,64 @@ Summaries are automatically appended to the progress file (without color codes) 
 - `--no-summaries`: Disable iteration summaries entirely for backwards compatibility or when raw output is preferred.
 
 This script is used internally by the SDLC plugin's `feature-loop` to implement feature specs.
+
+### Model Selection
+
+The `ralph-loop` script allows you to specify which model to use for agent invocations via the `--model` parameter. This provides flexibility to use different Claude models based on your needs.
+
+**Default behavior:**
+- If not specified, the model defaults to "claude" which uses the Claude CLI's default model
+- The model parameter is passed directly to the `claude` command
+
+**Usage examples:**
+```bash
+# Use default model
+./plugins/spawn/scripts/ralph-loop --spec specs/feature.md
+
+# Explicitly specify model (relies on Claude CLI's model resolution)
+./plugins/spawn/scripts/ralph-loop --spec specs/feature.md --model claude
+```
+
+**Configuration:**
+You can also set a default model in the `.claude-kit` configuration file (see Configuration section in feature-loop documentation below).
+
+### Log Capture
+
+The `ralph-loop` script supports comprehensive log capture for debugging and analysis. When you provide the `--log` or `--log-file` parameter, the script creates a detailed JSONL (JSON Lines) format log file that captures the entire execution trace.
+
+**What gets logged:**
+- Configuration snapshot (all run parameters for reproducibility)
+- Iteration start/end events with timestamps and durations
+- Full command invocations (the exact `claude` commands executed)
+- Complete agent outputs (with automatic truncation for very large outputs >1MB)
+- Error details with full context and stack traces
+- Final completion status and statistics
+
+**Log file format:**
+- JSONL format: Each line is a complete JSON object
+- Easy to parse with tools like `jq`, Python's `json` module, or log aggregation tools
+- Includes both ISO 8601 timestamps and elapsed time from script start
+- Thread-safe for potential concurrent logging
+
+**Usage examples:**
+```bash
+# Basic logging
+./plugins/spawn/scripts/ralph-loop --spec specs/feature.md --log /tmp/ralph.log
+
+# Verify log file was created and contains valid JSON
+test -f /tmp/ralph.log && echo "Log file created" || echo "ERROR: Log file missing"
+python -c "import json; [json.loads(line) for line in open('/tmp/ralph.log')]" && echo "Valid JSON" || echo "ERROR: Invalid JSON"
+
+# Analyze logs with jq (show all iteration events)
+cat /tmp/ralph.log | jq 'select(.event_type == "iteration_start" or .event_type == "iteration_end")'
+
+# Extract timing data
+cat /tmp/ralph.log | jq 'select(.duration) | {event: .event_type, duration: .duration}'
+
+# Find errors
+cat /tmp/ralph.log | jq 'select(.event_type == "error")'
+```
+
+**Security note:** Log files may contain sensitive information from prompts and outputs. Ensure appropriate file permissions and avoid committing logs to version control.
+
+**Performance:** Logging has minimal performance impact. The logger uses buffered writes and automatically truncates very large outputs to prevent memory issues.

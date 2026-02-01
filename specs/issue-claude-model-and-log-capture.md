@@ -156,6 +156,7 @@ Update all Claude CLI invocations to use the configurable model parameter and lo
 - Verify no hardcoded "claude" strings remain in command construction
 
 ### Add Documentation
+**Status:** complete
 - Update `plugins/spawn/README.md` with:
   - Model selection usage examples
   - Log capture usage examples

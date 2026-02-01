@@ -62,6 +62,15 @@ Automated SDLC workflow that chains together planning, implementation, and itera
 
 # Verbose mode
 ./plugins/sdlc/scripts/feature-loop -v "Add dashboard"
+
+# With specific model
+./plugins/sdlc/scripts/feature-loop "Add feature" --model claude
+
+# With detailed logging for debugging
+./plugins/sdlc/scripts/feature-loop "Add feature" --log /tmp/feature.log
+
+# Combined usage
+./plugins/sdlc/scripts/feature-loop "Add feature" --model claude --log /tmp/feature.log --max-review-iterations 3
 ```
 
 **Options:**
@@ -70,6 +79,8 @@ Automated SDLC workflow that chains together planning, implementation, and itera
 - `--max-review-iterations`, `-m`: Maximum review/fix cycles (default: 5)
 - `--skip-review`: Skip the review loop
 - `--verbose`, `-v`: Enable verbose logging
+- `--model MODEL`: Model to use for agent invocations (default from config or "claude")
+- `--log FILE` or `--log-file FILE`: Path to log file for detailed execution capture (optional)
 - `--resume`: Resume from auto-detected checkpoint state
 - `--resume-from PATH`: Resume from specific checkpoint state file
 - `--no-resume`: Force fresh start, ignore existing checkpoint
@@ -139,10 +150,14 @@ Command-line arguments always override configuration file values.
 ```json
 {
   "feature_loop": {
+    "model": "claude",
     "max_implement_iterations": 0,
     "max_review_iterations": 5,
     "skip_review": false,
     "verbose": false
+  },
+  "ralph_loop": {
+    "model": "claude"
   },
   "acr": {
     "num_reviewers": 5
@@ -152,10 +167,12 @@ Command-line arguments always override configuration file values.
 
 **Configuration Options:**
 
+- `feature_loop.model` (string): Model to use for agent invocations during planning and triage (default: "claude")
 - `feature_loop.max_implement_iterations` (integer): Maximum ralph-loop iterations for implementation, 0=unlimited (default: 0)
 - `feature_loop.max_review_iterations` (integer): Maximum number of review/fix cycles before stopping (default: 5)
 - `feature_loop.skip_review` (boolean): Whether to skip the review phase entirely (default: false)
 - `feature_loop.verbose` (boolean): Enable verbose logging output (default: false)
+- `ralph_loop.model` (string): Model to use for ralph-loop implementation iterations (default: "claude")
 - `acr.num_reviewers` (integer): Number of AI reviewers for code review (default: 5)
 
 **Example Configurations:**
@@ -269,11 +286,101 @@ cp .claude-kit.example .claude-kit
 **Configuration Validation:**
 
 The script validates configuration values and provides helpful error messages:
+- `model` must be a non-empty string
 - `max_implement_iterations` must be a non-negative integer (0 = unlimited)
 - `max_review_iterations` must be a positive integer
 - `skip_review` and `verbose` must be boolean values (true/false)
 - Invalid JSON will be reported with the error location
 - Unknown fields are ignored for forward compatibility
+
+### Model Selection
+
+The `feature-loop` script allows you to specify which model to use for agent invocations through configuration files or CLI arguments.
+
+**Model configuration precedence (highest to lowest):**
+1. Command-line argument: `--model claude`
+2. Configuration file: `feature_loop.model` or `ralph_loop.model`
+3. Default: "claude"
+
+**Where models are used:**
+- Planning phase (`run_feature_plan`): Uses `feature_loop.model`
+- Implementation phase (`ralph-loop`): Uses `ralph_loop.model` (passed to ralph-loop script)
+- Triage phase (`triage_and_fix_issues`): Uses `feature_loop.model`
+
+**Usage examples:**
+```bash
+# Use model from config file
+./plugins/sdlc/scripts/feature-loop "Add feature"
+
+# Override with CLI argument
+./plugins/sdlc/scripts/feature-loop "Add feature" --model claude
+
+# Configure different models for different phases
+# In .claude-kit:
+{
+  "feature_loop": {
+    "model": "claude"
+  },
+  "ralph_loop": {
+    "model": "claude"
+  }
+}
+```
+
+**Default behavior:**
+- If not configured, the model defaults to "claude" which uses the Claude CLI's default model
+- The model parameter is passed directly to the `claude` command
+
+### Log Capture
+
+The `feature-loop` script supports comprehensive log capture for debugging and analysis. When you provide the `--log` or `--log-file` parameter, the script creates detailed JSONL (JSON Lines) format log files that capture the entire workflow.
+
+**What gets logged:**
+- Configuration snapshot (all run parameters for reproducibility)
+- Planning phase with command execution and timing
+- Implementation phase (separate log created for ralph-loop with "-ralph" suffix)
+- Review and triage phases with command executions and timing
+- Error details with full context for any failures
+- Final completion status
+
+**Log file format:**
+- JSONL format: Each line is a complete JSON object
+- Easy to parse with tools like `jq`, Python's `json` module, or log aggregation tools
+- Includes both ISO 8601 timestamps and elapsed time from script start
+- Thread-safe for potential concurrent logging
+
+**Log files created:**
+- Main log: Specified path (e.g., `/tmp/feature.log`)
+- Ralph-loop log: Main path with "-ralph" suffix (e.g., `/tmp/feature-ralph.log`)
+
+**Usage examples:**
+```bash
+# Basic logging
+./plugins/sdlc/scripts/feature-loop "Add feature" --log /tmp/feature.log
+
+# Verify log files were created
+test -f /tmp/feature.log && echo "Main log created"
+test -f /tmp/feature-ralph.log && echo "Ralph log created"
+
+# Verify valid JSON
+python -c "import json; [json.loads(line) for line in open('/tmp/feature.log')]" && echo "Valid JSON"
+
+# Analyze logs with jq (show planning events)
+cat /tmp/feature.log | jq 'select(.event_type | startswith("planning"))'
+
+# Extract timing data
+cat /tmp/feature.log | jq 'select(.duration) | {phase: .event_type, duration: .duration}'
+
+# Analyze ralph-loop iterations
+cat /tmp/feature-ralph.log | jq 'select(.event_type == "iteration_end") | {iteration: .iteration, duration: .duration, exit_code: .exit_code}'
+
+# Find errors across all logs
+cat /tmp/feature*.log | jq 'select(.event_type == "error")'
+```
+
+**Security note:** Log files may contain sensitive information from prompts and outputs. Ensure appropriate file permissions and avoid committing logs to version control.
+
+**Performance:** Logging has minimal performance impact. The logger uses buffered writes and automatically truncates very large outputs to prevent memory issues.
 
 ## Development
 

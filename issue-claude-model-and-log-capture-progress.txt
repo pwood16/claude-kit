@@ -596,3 +596,106 @@ All Claude CLI invocations have been updated to use the model parameter. No hard
 
 Status: Completed
 Status: Completed
+
+======================================================================
+Iteration 7 Summary - 2026-02-01 09:43:48
+======================================================================
+
+Task: Add Documentation
+
+Status: ○ Incomplete
+
+Files changed: 3
+  Modified (3):
+    ~ specs/issue-claude-model-and-log-capture.md
+    ~ ssue-claude-model-and-log-capture-progress.txt
+    ~ plugins/spawn/scripts/ralph-loop
+
+Exit status: Success
+
+Progress: 7 of 9 tasks complete
+
+======================================================================
+
+### Iteration 8 - 2026-02-01 09:43:50
+
+**Task Completed:** Add Documentation
+
+**What was done:**
+1. Updated `plugins/spawn/README.md` with comprehensive documentation:
+   - Added `--model` and `--log` / `--log-file` options to the ralph-loop Options section
+   - Added usage examples showing model selection and log capture
+   - Created new "Model Selection" section explaining:
+     - Default behavior (uses "claude" which relies on Claude CLI's default)
+     - How to specify models via CLI
+     - Reference to configuration file for default model setting
+   - Created new "Log Capture" section with extensive details:
+     - What gets logged (configuration, iterations, commands, outputs, errors)
+     - Log file format (JSONL with timestamps and durations)
+     - Usage examples with jq for log analysis
+     - Security notes about sensitive information
+     - Performance notes about buffering and truncation
+
+2. Updated `plugins/sdlc/README.md` with comprehensive documentation:
+   - Added `--model` and `--log` / `--log-file` options to the Options section
+   - Added usage examples showing model and log parameters in feature-loop commands
+   - Updated Configuration Format section to include model fields in both feature_loop and ralph_loop
+   - Updated Configuration Options section to document feature_loop.model and ralph_loop.model
+   - Created new "Model Selection" section explaining:
+     - Configuration precedence (CLI > config > default)
+     - Where models are used (planning, implementation, triage phases)
+     - Usage examples with config file and CLI override
+     - Default behavior
+   - Created new "Log Capture" section with extensive details:
+     - What gets logged across all workflow phases
+     - Log file format (JSONL)
+     - Log files created (main log + ralph-loop log with "-ralph" suffix)
+     - Usage examples with jq for analyzing logs across phases
+     - Security and performance notes
+
+3. Verified `.claude-kit.example` at repo root:
+   - File already contains correct structure with model fields in feature_loop and ralph_loop sections
+   - JSON format is clean and self-documenting
+   - No comments needed (JSON doesn't support them, documentation is in READMEs)
+
+4. Marked task as complete in spec file:
+   - Added `**Status:** complete` line after "### Add Documentation" heading
+
+**Key Design Decisions:**
+- Separated model selection and log capture into distinct sections for clarity
+- Provided practical usage examples with jq for log analysis (developers need concrete examples)
+- Emphasized JSONL format benefits (streaming, easy parsing, tool compatibility)
+- Documented security implications of logging (sensitive information)
+- Explained log file naming convention (main log + "-ralph" suffix for ralph-loop)
+- Documented configuration precedence clearly (CLI > config > default)
+- Explained where different models are used in feature-loop (planning, implementation, triage)
+- Included performance notes (buffering, truncation) to set expectations
+
+**Issues Encountered:**
+- None - documentation was straightforward to write with comprehensive coverage
+
+**Documentation Quality:**
+- Both READMEs now have complete documentation for the new features
+- Examples are practical and demonstrate real-world usage
+- Security and performance considerations are clearly noted
+- Documentation is consistent between spawn and sdlc plugins
+- Configuration file (.claude-kit.example) is clean and ready for users to copy
+
+**User Experience Improvements:**
+- Users can now understand how to use model selection via CLI or config
+- Users have clear examples of how to enable and analyze logs
+- jq examples show how to extract useful information from logs
+- Configuration precedence is clearly explained
+- Log file format is well-documented for tool integration
+
+**Next Steps:**
+The documentation is now complete and comprehensive. Users have clear guidance on:
+- How to select models (CLI arguments or configuration files)
+- How to enable and use log capture for debugging
+- How to analyze logs with standard tools like jq
+- Security and performance considerations
+
+The next and final task is to run validation commands to ensure the feature works correctly with zero regressions.
+
+Status: Completed
+Status: Completed
