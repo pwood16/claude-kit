@@ -10,5 +10,6 @@ This is a test specification to validate the observability features implemented 
 - Create a file called `test-observability-file.txt` with content "Hello from test"
 
 ### Step 2: Verify summaries work
+**Status:** complete
 - Verify that iteration summaries appear correctly
 - Check that file changes are tracked

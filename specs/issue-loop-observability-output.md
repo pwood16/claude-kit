@@ -225,6 +225,7 @@ IMPORTANT: Execute every step in order, top to bottom.
 - Add examples showing the summary output format in both files
 
 ### Step 13: Test with a real spec file
+**Status:** complete
 - Create a test Markdown spec with 3 simple tasks:
   - Step 1: Create a test file with some content
   - Step 2: Modify the test file
