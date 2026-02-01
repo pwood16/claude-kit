@@ -266,9 +266,13 @@ def diff_file_changes(
     after_deleted = set(after["deleted"])
 
     # Compute differences
+    # For newly added files, use simple set subtraction
     newly_added = list(after_added - before_added)
-    newly_modified = list(after_modified - before_modified)
     newly_deleted = list(after_deleted - before_deleted)
+
+    # For modified files, include files that were already modified if they remain modified
+    # This catches edits to already-dirty files
+    newly_modified = list(after_modified)
 
     return {
         "added": newly_added,
@@ -404,22 +408,18 @@ def generate_iteration_summary(
     completed_tasks = sum(1 for task in tasks if task[-1] == "complete")
 
     # Find current task (the one that was just worked on)
-    # We look for the most recently completed task, or the first incomplete one
-    current_task = None
-    task_status = "incomplete"
-
-    # Try to find the last completed task (assuming it was just completed this iteration)
-    for task in reversed(tasks):
-        if task[-1] == "complete":
-            current_task = task
-            task_status = "complete"
-            break
-
-    # If no complete tasks, find the first incomplete one
-    if current_task is None:
-        current_task = find_current_task(tasks)
-        if current_task:
-            task_status = "incomplete"
+    # Prefer the first incomplete task if it exists, as it represents current work
+    # Otherwise fall back to the last completed task
+    current_task = find_current_task(tasks)
+    if current_task:
+        task_status = "incomplete"
+    else:
+        # No incomplete tasks - find the last completed task
+        for task in reversed(tasks):
+            if task[-1] == "complete":
+                current_task = task
+                task_status = "complete"
+                break
 
     # Extract task title based on format
     if current_task:
@@ -669,7 +669,7 @@ def check_markdown_completion(spec_file: Path) -> int:
     return pending
 
 
-def generate_json_prompt(spec_basename: str, progress_file: Path, completion_promise: str) -> str:
+def generate_json_prompt(spec_path: str, progress_file: Path, completion_promise: str) -> str:
     """Generate the iteration prompt for JSON format specs."""
     return f"""# Ralph Wiggum Loop - Iteration Prompt
 
@@ -677,11 +677,11 @@ You are an autonomous AI agent working through a spec to complete all stories.
 
 ## Your Task
 
-1. Read `{spec_basename}` to understand the stories and their status
+1. Read `{spec_path}` to understand the stories and their status
 2. Read `{progress_file}` to understand what has been learned in previous iterations
 3. Select the highest-priority incomplete story that is not blocked
 4. Implement the story completely
-5. Update `{spec_basename}` to mark the story with `"status": "complete"` when done
+5. Update `{spec_path}` to mark the story with `"status": "complete"` when done
 6. Append learnings to `{progress_file}`
 
 ## Important Rules
@@ -708,10 +708,10 @@ Before marking a story as complete:
 
 ## Begin
 
-Read `{spec_basename}` and `{progress_file}` now, then implement the next incomplete story."""
+Read `{spec_path}` and `{progress_file}` now, then implement the next incomplete story."""
 
 
-def generate_markdown_prompt(spec_basename: str, progress_file: Path, completion_promise: str) -> str:
+def generate_markdown_prompt(spec_path: str, progress_file: Path, completion_promise: str) -> str:
     """Generate the iteration prompt for Markdown format specs."""
     return f"""# Ralph Wiggum Loop - Iteration Prompt
 
@@ -719,11 +719,11 @@ You are an autonomous AI agent working through a feature spec to complete all ta
 
 ## Your Task
 
-1. Read `{spec_basename}` to understand the feature and the Step by Step Tasks
+1. Read `{spec_path}` to understand the feature and the Step by Step Tasks
 2. Read `{progress_file}` to understand what has been done in previous iterations
 3. Find the first incomplete task (a task without `**Status:** complete` after its heading)
 4. Implement that task completely
-5. Update `{spec_basename}` to mark the task as complete by adding `**Status:** complete` on the line after the h3 heading
+5. Update `{spec_path}` to mark the task as complete by adding `**Status:** complete` on the line after the h3 heading
 6. Append learnings to `{progress_file}`
 
 ## Important Rules
@@ -761,7 +761,7 @@ Before marking a task as complete:
 
 ## Begin
 
-Read `{spec_basename}` and `{progress_file}` now, then implement the next incomplete task."""
+Read `{spec_path}` and `{progress_file}` now, then implement the next incomplete task."""
 
 
 def check_completion_promise(output: str, promise: str) -> bool:
@@ -875,7 +875,7 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
     # Initialize progress file
     progress_file = initialize_progress_file(spec_file)
 
-    spec_basename = spec_file.name
+    spec_path = str(spec_file)
     spec_name = spec_file.stem
 
     # Print header
@@ -883,7 +883,7 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
     print("  Ralph Wiggum Loop")
     print("======================================")
     print()
-    print(f"Spec file:          {spec_basename}")
+    print(f"Spec file:          {spec_path}")
     print(f"Spec format:        {spec_format}")
     print(f"Progress file:      {progress_file}")
     print(f"Max iterations:     {max_iterations}")
@@ -924,9 +924,9 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
 
         # Generate format-specific prompt
         if spec_format == "json":
-            prompt = generate_json_prompt(spec_basename, progress_file, completion_promise)
+            prompt = generate_json_prompt(spec_path, progress_file, completion_promise)
         else:
-            prompt = generate_markdown_prompt(spec_basename, progress_file, completion_promise)
+            prompt = generate_markdown_prompt(spec_path, progress_file, completion_promise)
 
         # Capture git status before iteration
         before_files = get_git_status()

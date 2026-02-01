@@ -1,16 +1,16 @@
 {
   "version": "1",
-  "feature_prompt": "Add a simple test function",
-  "plan_path": "/Users/cabewaldrop/dev/claude-kit/specs/issue-simple-test-function.md",
+  "feature_prompt": "Ok I'd like the agent and summarizer to use claude. The default is codex, but for this script I'd like it to be claude. Additionally I'd like the run to be captured in a log file if log parameter is passed. This will help us debug runs and improve the scripts performance with more data",
+  "plan_path": "/Users/cabewaldrop/dev/claude-kit/specs/issue-claude-model-and-log-capture.md",
   "phase": "implementing",
   "review_iteration": 0,
-  "started_at": "2026-02-01T08:18:30.597904",
-  "updated_at": "2026-02-01T08:18:30.597974",
+  "started_at": "2026-02-01T09:23:37.512962",
+  "updated_at": "2026-02-01T09:23:37.513031",
   "config": {
     "max_review_iterations": 5,
-    "max_implement_iterations": 3,
-    "skip_review": true,
-    "verbose": true,
+    "max_implement_iterations": 0,
+    "skip_review": false,
+    "verbose": false,
     "num_reviewers": 5
   }
 }

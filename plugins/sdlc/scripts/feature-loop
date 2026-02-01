@@ -817,6 +817,10 @@ def parse_implementation_results(spec_file) -> dict[str, Any]:
                 in_tasks = True
                 continue
 
+            # Stop counting when we hit another h2 section (##) after entering tasks section
+            if in_tasks and line.strip().startswith("## ") and not ("step by step" in line.lower() and "task" in line.lower()):
+                break
+
             if in_tasks:
                 # Look for h3 headings (### )
                 if line.strip().startswith("### "):
@@ -1324,6 +1328,12 @@ Configuration:
             start_iteration = checkpoint_state["review_iteration"] + 1
             if start_iteration > 1:
                 log("RESUME", f"Resuming review from iteration {start_iteration}")
+
+            # Check if we've already exhausted max iterations
+            if start_iteration > args.max_review_iterations:
+                log("ERROR", f"Already reached max review iterations ({args.max_review_iterations})")
+                log("ERROR", "Manual review recommended")
+                sys.exit(1)
 
         for iteration in range(start_iteration, args.max_review_iterations + 1):
             log("LOOP", f"Review iteration {iteration}/{args.max_review_iterations}")

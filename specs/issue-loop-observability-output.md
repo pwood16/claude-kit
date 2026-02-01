@@ -237,6 +237,7 @@ IMPORTANT: Execute every step in order, top to bottom.
 - Test `--summary-only` and `--no-summaries` flags
 
 ### Step 14: Test feature-loop integration
+**Status:** complete
 - Run feature-loop with a simple feature (use `--max-implement-iterations 3` and `--max-review-iterations 2` to limit)
 - Verify implementation summary appears after ralph-loop completes
 - Verify ACR summaries appear after each review run (if not using `--skip-review`)
@@ -244,6 +245,7 @@ IMPORTANT: Execute every step in order, top to bottom.
 - Verify no regressions in existing functionality (checkpoint saving, resume, etc.)
 
 ### Step 15: Run validation commands
+**Status:** complete
 - Execute all commands in the Validation Commands section below
 - Verify all tests pass with zero errors
 - Verify summary output appears correctly in all scenarios
