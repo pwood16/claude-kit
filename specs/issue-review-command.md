@@ -115,6 +115,7 @@ Create the review-loop script with the following capabilities:
 - Support `.claude-kit` config precedence: home → git-root → cwd → CLI args
 
 ### Step 3: Implement review execution logic
+**Status:** complete
 - Copy and adapt review functions from feature-loop:
   - `log()` function for timestamped logging
   - `run_command()` function for subprocess execution
