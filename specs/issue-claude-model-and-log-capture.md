@@ -112,6 +112,7 @@ Update all Claude CLI invocations to use the configurable model parameter and lo
 - Update docstring and examples in epilog
 
 ### Update feature-loop CLI Arguments
+**Status:** complete
 - Add `--model` argument to main parser (after line 1145):
   - Type: `str`
   - Default from config or `"claude"`

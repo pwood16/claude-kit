@@ -197,3 +197,73 @@ The ralph-loop CLI now accepts model and log file parameters. The next task is t
 
 Status: Completed
 Status: Completed
+
+======================================================================
+Iteration 3 Summary - 2026-02-01 09:30:56
+======================================================================
+
+Task: Update feature-loop CLI Arguments
+
+Status: ○ Incomplete
+
+Files changed: 3
+  Modified (3):
+    ~ specs/issue-claude-model-and-log-capture.md
+    ~ ssue-claude-model-and-log-capture-progress.txt
+    ~ plugins/spawn/scripts/ralph-loop.py
+
+Exit status: Success
+
+Progress: 3 of 9 tasks complete
+
+======================================================================
+
+### Iteration 4 - 2026-02-01 09:30:58
+
+**Task Completed:** Update feature-loop CLI Arguments
+
+**What was done:**
+1. Added `--model` argument to the argument parser in `plugins/sdlc/scripts/feature-loop` (after line 1186):
+   - Type: str
+   - Default: Uses `default_model` from configuration (which defaults to "claude")
+   - Help text: "Model to use for agent invocations (default: {default_model})"
+   - Integrates seamlessly with existing configuration system
+
+2. Added `--log` / `--log-file` argument to the argument parser:
+   - Accepts both `--log` and `--log-file` as aliases (using dest="log_file")
+   - Type: str
+   - Default: None (optional parameter)
+   - Help text: "Path to log file for detailed execution capture (optional)"
+   - Makes logging opt-in, only when users explicitly need it
+
+3. Updated the epilog section with a comprehensive example:
+   - Added example: `%(prog)s "Add API endpoint" --model claude --log /tmp/feature.log`
+   - Shows both new parameters in action
+   - Maintains consistency with existing examples
+
+4. Updated spec file to mark task as complete:
+   - Added `**Status:** complete` line after "### Update feature-loop CLI Arguments" heading
+
+**Key Design Decisions:**
+- Positioned new arguments after `--num-reviewers` to keep related arguments together
+- Used `default_model` from configuration system for `--model` default, ensuring CLI args override config
+- Made both `--log` and `--log-file` available as aliases for flexibility (matches ralph-loop implementation)
+- Log file is optional (None by default) to maintain backwards compatibility
+- Help text dynamically includes the actual default value from configuration
+- Added practical example showing both parameters together in a realistic use case
+
+**Issues Encountered:**
+- None - implementation was straightforward and followed the established pattern from ralph-loop
+
+**Testing Considerations:**
+- The new arguments are now available in the CLI interface
+- Users can run `feature-loop --help` to see the new parameters
+- The arguments will be accessible via `args.model` and `args.log_file` in the script
+- Model default respects configuration precedence (CLI > config > "claude")
+- Still need to integrate these parameters into the actual execution logic in subsequent tasks
+
+**Next Steps:**
+Both ralph-loop and feature-loop now have CLI support for model and log file parameters. The next task is to integrate logging in ralph-loop by importing the StructuredLogger and updating the execution functions to use the new parameters.
+
+Status: Completed
+Status: Completed

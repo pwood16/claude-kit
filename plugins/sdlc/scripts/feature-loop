@@ -1105,6 +1105,7 @@ Examples:
     %(prog)s "Fix login bug" --skip-review
     %(prog)s "Add feature" --no-verbose  # Override config verbose=true
     %(prog)s "Add feature" --no-skip-review  # Override config skip_review=true
+    %(prog)s "Add API endpoint" --model claude --log /tmp/feature.log
 
 Configuration:
     Settings can be configured in .claude-kit files (JSON format).
@@ -1183,6 +1184,19 @@ Configuration:
         type=int,
         default=default_num_reviewers,
         help=f"Number of acr reviewers (0=use acr default, default: {default_num_reviewers})"
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=default_model,
+        help=f"Model to use for agent invocations (default: {default_model})"
+    )
+    parser.add_argument(
+        "--log", "--log-file",
+        dest="log_file",
+        type=str,
+        default=None,
+        help="Path to log file for detailed execution capture (optional)"
     )
     parser.set_defaults(
         verbose=default_verbose,
