@@ -40,9 +40,11 @@ Automated SDLC workflow that chains together planning, implementation, and itera
 **What it does:**
 1. Creates a feature plan using `/sdlc:feature`
 2. Implements the plan using `ralph-loop` (iterative task completion, one task per iteration)
-3. Runs code review with `acr --local`
-4. Triages findings (fixes real issues, adds comments for false positives)
-5. Repeats review until clean (LGTM) or max iterations reached
+3. Displays implementation summary (iterations, tasks completed, files modified)
+4. Runs code review with `acr --local`
+5. Displays review findings summary before triage
+6. Triages findings (fixes real issues, adds comments for false positives)
+7. Repeats review until clean (LGTM) or max iterations reached
 
 **Usage:**
 ```bash
@@ -188,6 +190,73 @@ Skip reviews by default:
   }
 }
 ```
+
+**Enhanced Observability:**
+
+The `feature-loop` script provides comprehensive visibility into the automated workflow through structured summaries:
+
+**Implementation Summary:**
+
+After the `ralph-loop` implementation phase completes, a summary is displayed showing:
+- Total iterations run
+- Tasks completed (X of Y)
+- Files modified during implementation
+- Overall status (ready for review / some tasks incomplete)
+
+Example:
+```
+===================================================================
+Implementation Phase Complete - 2026-02-01 08:15:30
+===================================================================
+Total Iterations: 5
+Tasks Completed: 5 of 5 tasks (100%)
+Files Modified:
+  - src/auth/login.py
+  - src/auth/middleware.py
+  - tests/test_auth.py
+  - migrations/002_add_users.sql
+Status: Ready for review
+===================================================================
+```
+
+**Code Review Summary:**
+
+After each `acr` review run, a summary is displayed before triage showing:
+- Total findings count
+- Affected files with finding count per file
+- Finding categories (if detected: errors, warnings, security issues)
+- LGTM status or indication that fixes are needed
+
+Example (with findings):
+```
+===================================================================
+Code Review Summary - Iteration 1 - 2026-02-01 08:20:15
+===================================================================
+Total Findings: 3 issues found
+Affected Files:
+  - src/auth/login.py (2 findings)
+  - src/auth/middleware.py (1 finding)
+Finding Categories: Security, Error Handling
+Status: Issues found - proceeding to triage
+===================================================================
+```
+
+Example (LGTM):
+```
+===================================================================
+Code Review Summary - Iteration 2 - 2026-02-01 08:25:45
+===================================================================
+Total Findings: 0 issues
+Status: LGTM ✓
+===================================================================
+```
+
+**Summary Features:**
+- Color coding for quick visual scanning (green=success, yellow=warnings, red=errors)
+- Concise output (fits on one screen)
+- Clear visual boundaries with separator lines
+- Summaries are logged to `.feature-loop-{sanitized-prompt}.log` for historical reference
+- Integration with `ralph-loop` iteration summaries (see spawn plugin README for details)
 
 **Getting Started:**
 

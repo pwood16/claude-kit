@@ -269,6 +269,8 @@ The `ralph-loop` script can also be used standalone (outside of `/spawn:wt-agent
 - `--spec FILE` or `--prd FILE`: Path to spec file (required)
 - `--max-iterations N`: Maximum iterations before stopping (default: 0 = unlimited)
 - `--completion-promise TEXT`: String that signals completion (default: "TASK COMPLETE")
+- `--summary-only`: Show only iteration summaries, suppress verbose Claude output
+- `--no-summaries`: Disable iteration summaries (for backwards compatibility)
 
 **How it works:**
 1. Validates the spec file format (Markdown or JSON)
@@ -277,5 +279,43 @@ The `ralph-loop` script can also be used standalone (outside of `/spawn:wt-agent
 4. Agent updates the spec to mark tasks complete
 5. Commits changes after each iteration
 6. Exits when all tasks are complete or max iterations reached
+
+**Iteration Summaries:**
+
+After each iteration, `ralph-loop` displays a structured summary showing:
+- Iteration number and timestamp
+- Task that was worked on (from h3 heading for Markdown, story title for JSON)
+- Task completion status (complete/incomplete with color coding)
+- Files modified, added, or deleted during the iteration
+- Exit status (success/failed)
+- Overall progress (X of Y tasks complete)
+
+Example summary output:
+```
+===================================================================
+Iteration 1 Summary - 2026-02-01 08:00:00
+===================================================================
+Task: Step 1: Create the database schema
+Status: complete
+Files Modified:
+  - migrations/001_create_users.sql
+  - migrations/002_add_indexes.sql
+Exit Status: Success
+Progress: 1 of 3 tasks complete
+===================================================================
+```
+
+Summaries use color coding for quick visual scanning:
+- Green: Success, completed tasks
+- Yellow: Incomplete tasks, warnings
+- Red: Errors, failures
+- Blue: Modified files
+
+Summaries are automatically appended to the progress file (without color codes) for historical reference.
+
+**Summary Control Flags:**
+
+- `--summary-only`: Suppress verbose Claude output, show only iteration summaries. Useful for monitoring progress without full conversation logs.
+- `--no-summaries`: Disable iteration summaries entirely for backwards compatibility or when raw output is preferred.
 
 This script is used internally by the SDLC plugin's `feature-loop` to implement feature specs.

@@ -212,6 +212,7 @@ IMPORTANT: Execute every step in order, top to bottom.
 - Add implementation summary to progress or checkpoint file
 
 ### Step 12: Update documentation
+**Status:** complete
 - Update `plugins/spawn/README.md`:
   - Add section describing new summary output format
   - Document `--summary-only` and `--no-summaries` flags

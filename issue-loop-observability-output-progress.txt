@@ -269,3 +269,39 @@ Learnings:
 
 Status: Completed
 Status: Completed
+
+### Iteration 7 - 2026-02-01 08:00:34
+
+### Iteration 8 - $(date '+%Y-%m-%d %H:%M:%S')
+
+### Step 12 - Update documentation
+Status: Complete
+
+What was done:
+- Updated plugins/spawn/README.md to document new observability features:
+  - Added --summary-only and --no-summaries flags to ralph-loop options section
+  - Added comprehensive "Iteration Summaries" section explaining the summary output format
+  - Included example summary output with color coding explanation
+  - Documented summary control flags (--summary-only and --no-summaries)
+  - Explained that summaries are automatically appended to progress files
+- Updated plugins/sdlc/README.md to document enhanced observability in feature-loop:
+  - Updated "What it does" section to include implementation and review summaries
+  - Added comprehensive "Enhanced Observability" section with:
+    - Implementation Summary format and example
+    - Code Review Summary format with examples (both with findings and LGTM)
+    - Summary features (color coding, visual boundaries, logging)
+    - Note about integration with ralph-loop iteration summaries
+- Both README files now provide clear documentation with concrete examples of what users will see
+
+Learnings:
+- Documentation should show concrete examples, not just describe features
+- Example output helps users understand what to expect from the feature
+- Color coding explanation is important for users to quickly interpret summaries
+- Cross-referencing between plugins (spawn and sdlc) helps users understand the full workflow
+- Documenting both positive (LGTM) and negative (findings) scenarios helps set expectations
+- Including feature descriptions in "What it does" section provides high-level overview
+- Detailed subsections with examples provide in-depth understanding
+- Documentation should explain both what summaries contain and how they're used (logged to files)
+
+Status: Completed
+Status: Completed
