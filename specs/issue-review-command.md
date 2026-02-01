@@ -168,6 +168,7 @@ Create the review-loop script with the following capabilities:
 - Document the expected behavior and options
 
 ### Step 8: Update plugin documentation
+**Status:** complete
 - Update `plugins/sdlc/README.md` to add `/sdlc:review` to the Commands section
 - Include:
   - Command description and purpose

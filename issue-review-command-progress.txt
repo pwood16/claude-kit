@@ -426,3 +426,74 @@ Status: Completed
 
 ======================================================================
 Status: Completed
+
+======================================================================
+Iteration 7 Summary - 2026-02-01 10:19:05
+======================================================================
+
+Task: Step 8: Update plugin documentation
+
+Status: ○ Incomplete
+
+Files changed: 3
+  Added (1):
+    + plugins/sdlc/commands/review.md
+  Modified (2):
+    ~ ssue-review-command-progress.txt
+    ~ specs/issue-review-command.md
+
+Exit status: Success
+
+Progress: 7 of 15 tasks complete
+
+======================================================================
+
+### Iteration 8 - 2026-02-01 10:19:07
+**Task Completed:** Step 8 - Update plugin documentation
+
+**What was done:**
+- Updated `plugins/sdlc/README.md` to add `/sdlc:review` to the Commands section
+- Added comprehensive documentation including:
+  - Command description and purpose
+  - Usage examples (basic and advanced)
+  - All command-line options with descriptions
+  - How it works step-by-step explanation
+  - Configuration section with `.claude-kit` examples
+  - Configuration precedence order
+  - Use cases for the command
+- Added `review-loop` script to the Scripts section with:
+  - What it does (7-step process)
+  - Complete usage examples
+  - All options documented
+  - Requirements (claude CLI, acr CLI, uv)
+  - Configuration file locations and precedence
+  - Configuration format with JSON examples
+  - All configuration options with defaults
+  - Review summary format examples (both findings and LGTM)
+  - Triage process explanation
+  - Logging details (file path, format, accumulation)
+  - Integration note with feature-loop
+- Documentation follows the existing pattern from feature-loop documentation
+- Placed `/sdlc:review` command after `/sdlc:implement` in Commands section
+- Placed `review-loop` script after `feature-loop` in Scripts section
+
+**Learnings:**
+- The README follows a clear structure: Commands → Installation → Scripts → Development
+- Each command gets a subsection with usage examples and options
+- Scripts get more detailed documentation including configuration, requirements, and examples
+- Configuration documentation includes precedence rules, file locations, and JSON examples
+- Summary format examples help users understand what to expect from the tool
+- Integration notes help users understand how tools relate to each other
+- The documentation style is comprehensive but concise, using code blocks for examples
+- Following existing documentation patterns ensures consistency and usability
+
+**Issues encountered:**
+None. Step completed successfully.
+
+**Next steps:**
+- Step 9: Test basic functionality
+
+Status: Completed
+
+======================================================================
+Status: Completed

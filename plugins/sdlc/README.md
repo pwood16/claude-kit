@@ -22,6 +22,59 @@ Implement a plan file. Takes a path to a plan file (created by the above command
 
 Usage: `/sdlc:implement specs/issue-my-feature.md`
 
+### `/sdlc:review`
+
+Run an iterative code review loop to automatically diagnose and fix code quality issues. Continuously runs ACR (Automated Code Review), triages findings to determine if they're real issues or false positives, and takes appropriate action until code passes review or max iterations are reached.
+
+**Usage:**
+```bash
+# Basic usage
+/sdlc:review
+
+# With options
+/sdlc:review --max-iterations 3 --num-reviewers 5
+/sdlc:review --model claude --verbose
+/sdlc:review --log /tmp/review.log
+```
+
+**Options:**
+- `--max-iterations`, `-m`: Maximum review/fix cycles (default: 5)
+- `--num-reviewers`, `-r`: Number of ACR reviewers (default: 5)
+- `--model`: Model to use for triage (default: "claude")
+- `--verbose`, `-v`: Enable verbose logging
+- `--log`, `--log-file`: Path to log file for detailed execution capture
+
+**How it works:**
+1. Runs ACR with flags: `--local -a claude -s claude -r N`
+2. Parses findings and displays structured summary
+3. Invokes Claude to diagnose findings (real issues vs false positives)
+4. Fixes real issues and adds explanatory comments for false positives
+5. Repeats until LGTM or max iterations reached
+
+**Configuration:**
+
+Supports `.claude-kit` configuration files with precedence: home → git-root → cwd → CLI args
+
+Example configuration:
+```json
+{
+  "review_loop": {
+    "max_iterations": 5,
+    "model": "claude",
+    "verbose": false
+  },
+  "acr": {
+    "num_reviewers": 5
+  }
+}
+```
+
+**Use cases:**
+- Review code after manual development
+- Re-run review after fixing issues from a previous feature-loop
+- Run review with different configurations
+- Quick quality checks on branches before creating PRs
+
 ## Installation
 
 Part of claude-kit marketplace:
@@ -381,6 +434,130 @@ cat /tmp/feature*.log | jq 'select(.event_type == "error")'
 **Security note:** Log files may contain sensitive information from prompts and outputs. Ensure appropriate file permissions and avoid committing logs to version control.
 
 **Performance:** Logging has minimal performance impact. The logger uses buffered writes and automatically truncates very large outputs to prevent memory issues.
+
+### `review-loop`
+
+Standalone script for running iterative code review with ACR (Automated Code Review). This is the underlying implementation for the `/sdlc:review` command and can also be invoked directly.
+
+**What it does:**
+1. Validates that ACR CLI is available
+2. Runs ACR with configurable flags (`--local -a claude -s claude -r N`)
+3. Parses ACR output to identify findings
+4. Displays review summary before triage
+5. Invokes Claude to diagnose and fix/comment on findings
+6. Iterates until LGTM or max iterations reached
+7. Logs summaries to `.review-loop.log`
+
+**Usage:**
+```bash
+# Basic usage
+./plugins/sdlc/scripts/review-loop
+
+# With options
+./plugins/sdlc/scripts/review-loop --max-iterations 3 --num-reviewers 5
+./plugins/sdlc/scripts/review-loop --model claude --verbose
+./plugins/sdlc/scripts/review-loop --log /tmp/review.log
+
+# Help
+./plugins/sdlc/scripts/review-loop --help
+```
+
+**Options:**
+- `--max-iterations`, `-m`: Maximum review/fix cycles (default: 5)
+- `--num-reviewers`, `-r`: Number of ACR reviewers (default: 5)
+- `--model`: Model to use for triage (default: "claude")
+- `--verbose`, `-v`: Enable verbose logging
+- `--log`, `--log-file`: Path to log file (default: `.review-loop.log`)
+
+**Requirements:**
+- `claude` CLI in PATH
+- `acr` CLI in PATH
+- `uv` for running the Python script
+
+**Configuration:**
+
+The `review-loop` script supports configuration files to set default behavior. Configuration files are named `.claude-kit` and use JSON format.
+
+**Configuration File Locations (in precedence order):**
+1. `~/.claude-kit` - User home directory (personal defaults, lowest precedence)
+2. `<git-root>/.claude-kit` - Git repository root (project-wide settings)
+3. `./.claude-kit` - Current working directory (local overrides, highest precedence)
+
+Command-line arguments always override configuration file values.
+
+**Configuration Format:**
+
+```json
+{
+  "review_loop": {
+    "max_iterations": 5,
+    "model": "claude",
+    "verbose": false
+  },
+  "acr": {
+    "num_reviewers": 5
+  }
+}
+```
+
+**Configuration Options:**
+
+- `review_loop.max_iterations` (integer): Maximum number of review/fix cycles before stopping (default: 5)
+- `review_loop.model` (string): Model to use for triage (default: "claude")
+- `review_loop.verbose` (boolean): Enable verbose logging output (default: false)
+- `acr.num_reviewers` (integer): Number of AI reviewers for code review (default: 5)
+
+**Review Summary Format:**
+
+After each ACR run, a summary is displayed before triage showing:
+- Total findings count
+- Affected files with finding count per file
+- Finding categories (if detected: errors, warnings, security issues)
+- LGTM status or indication that fixes are needed
+
+Example (with findings):
+```
+===================================================================
+Code Review Summary - Iteration 1 - 2026-02-01 10:20:15
+===================================================================
+Total Findings: 3 issues found
+Affected Files:
+  - src/auth/login.py (2 findings)
+  - src/auth/middleware.py (1 finding)
+Finding Categories: Security, Error Handling
+Status: Issues found - proceeding to triage
+===================================================================
+```
+
+Example (LGTM):
+```
+===================================================================
+Code Review Summary - Iteration 2 - 2026-02-01 10:25:45
+===================================================================
+Total Findings: 0 issues
+Status: LGTM ✓
+===================================================================
+```
+
+**Triage Process:**
+
+The triage phase uses Claude to analyze each finding and determine:
+- **Real issues**: Code is fixed with minimal changes
+- **False positives**: Explanatory comments are added (using file-appropriate syntax)
+
+The diagnostic prompt instructs Claude to:
+- Analyze each finding independently
+- Make minimal fixes for real issues
+- Add clear comments for false positives
+- Document decisions in the output
+
+**Logging:**
+
+Review summaries are logged to `.review-loop.log` (or custom path via `--log`) for historical reference. Color codes are stripped from log entries for clean, readable logs. The log file accumulates summaries across multiple runs in append mode.
+
+**Integration with feature-loop:**
+
+The `review-loop` script shares the same review logic as the review phase in `feature-loop`, ensuring consistent behavior whether you're using the standalone review command or the full feature workflow.
 
 ## Development
 
