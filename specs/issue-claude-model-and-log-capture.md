@@ -137,6 +137,7 @@ Update all Claude CLI invocations to use the configurable model parameter and lo
 - Update all `run_claude_iteration()` call sites to pass model and logger
 
 ### Integrate Logging in feature-loop
+**Status:** complete
 - Import `StructuredLogger` from `lib.logger`
 - Initialize logger in `main()` if `--log` is provided
 - Update `run_plan()` to:

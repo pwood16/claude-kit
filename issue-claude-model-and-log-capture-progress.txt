@@ -381,3 +381,116 @@ The ralph-loop logging integration is complete. The next task is to integrate lo
 
 Status: Completed
 Status: Completed
+
+======================================================================
+Iteration 5 Summary - 2026-02-01 09:34:18
+======================================================================
+
+Task: Integrate Logging in feature-loop
+
+Status: ○ Incomplete
+
+Files changed: 3
+  Modified (3):
+    ~ specs/issue-claude-model-and-log-capture.md
+    ~ ssue-claude-model-and-log-capture-progress.txt
+    ~ plugins/spawn/scripts/ralph-loop.py
+
+Exit status: Success
+
+Progress: 5 of 9 tasks complete
+
+======================================================================
+
+### Iteration 6 - 2026-02-01 09:34:20
+
+**Task Completed:** Integrate Logging in feature-loop
+
+**What was done:**
+1. Added import for `StructuredLogger` from `lib.logger` with fallback import logic (similar to ralph-loop):
+   - First tries `from lib.logger import StructuredLogger`
+   - Falls back to adding lib directory to sys.path and importing directly
+   - Sets StructuredLogger to None if not available (graceful degradation)
+
+2. Initialized logger in `main()` function when `--log` parameter is provided:
+   - Creates logger right after argument parsing, before printing header
+   - Logs initialization event with feature prompt
+   - Added error handling - warns but continues without logging if initialization fails
+   - Added model and log file to CONFIG output
+   - Logs configuration snapshot with all run parameters (feature_prompt, model, max iterations, skip_review, etc.)
+   - Added logger.close() at end of main() to finalize logging
+
+3. Updated `run_feature_plan()` function to accept and use logger and model parameters:
+   - Added `logger: Optional[Any] = None` and `model: str = "claude"` parameters
+   - Changed command construction from hardcoded `["claude", ...]` to `[model, ...]`
+   - Added logging for planning_start event
+   - Added command execution logging (start and completion with output, exit code, duration)
+   - Added error logging for planning failures
+   - Added planning_complete event with duration
+   - Updated call site in main() to pass logger and model parameters
+
+4. Updated `triage_and_fix_issues()` function to accept and use logger and model parameters:
+   - Added `logger: Optional[Any] = None` and `model: str = "claude"` parameters
+   - Changed command construction from hardcoded `["claude", ...]` to `[model, ...]`
+   - Added logging for triage_start event with review output length
+   - Added command execution logging with timing
+   - Added error logging for triage failures
+   - Added triage_complete event with duration
+   - Updated call site to pass logger and model parameters
+
+5. Updated `run_implement()` function to accept and use logger and model parameters:
+   - Added `logger: Optional[Any] = None`, `model: str = "claude"`, and `log_file: Optional[str] = None` parameters
+   - Added logging for implementation_start event
+   - Modified ralph-loop command to include `--model` parameter
+   - Added `--log` parameter when log_file is provided (creates separate ralph-loop log with "-ralph" suffix)
+   - Added command execution logging
+   - Added implementation_complete event with exit code and duration
+   - Added error logging if ralph-loop script not found
+   - Updated call site in main() to pass logger, model, and log_file parameters
+
+6. Marked task as complete in spec file:
+   - Added `**Status:** complete` line after "### Integrate Logging in feature-loop" heading
+
+**Key Design Decisions:**
+- Used consistent import pattern from ralph-loop for StructuredLogger
+- Made all logging conditional (only when logger is provided) to maintain backwards compatibility
+- Changed hardcoded "claude" to use model parameter throughout all command constructions
+- Added comprehensive logging at key workflow phases: planning, implementation, triage
+- Captured timing data for all major operations (planning, implementation, triage)
+- Created separate log file for ralph-loop (with "-ralph" suffix) to distinguish logs
+- Passed model parameter to ralph-loop so it uses the same model consistently
+- Added logger.close() at end to finalize logging with metadata
+- Logged configuration snapshot at startup for reproducibility
+
+**Issues Encountered:**
+- None - implementation followed established patterns from ralph-loop integration
+
+**Testing Considerations:**
+- The model parameter now flows through all Claude CLI invocations (planning and triage)
+- Ralph-loop receives model parameter and creates separate log file
+- Logger captures all key workflow events when enabled
+- Backwards compatibility maintained - works without --log parameter
+- Configuration snapshot enables reproducing runs from logs
+- Timing data enables performance analysis across all phases
+
+**Verification:**
+The integration is complete and ready for testing. Users can now run:
+```bash
+feature-loop "Add feature" --model claude --log /tmp/feature.log
+```
+
+The log file will contain JSONL-formatted events including:
+- Configuration snapshot
+- Planning phase with command execution and timing
+- Implementation phase (delegated to ralph-loop with separate log)
+- Review and triage phases with command executions and timing
+- Error details with context for any failures
+- Final completion status
+
+Ralph-loop will create a separate log file at `/tmp/feature-ralph.log` with its detailed iteration logs.
+
+**Next Steps:**
+The feature-loop logging integration is complete. The next task is to update all Claude CLI invocations to ensure no hardcoded "claude" strings remain, followed by documentation updates.
+
+Status: Completed
+Status: Completed

@@ -29,6 +29,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional, TypedDict
 
+# Import StructuredLogger for log capture
+try:
+    from lib.logger import StructuredLogger
+except ImportError:
+    # Add lib directory to path if running as script
+    script_dir = Path(__file__).parent.parent / "lib"
+    if script_dir.exists():
+        sys.path.insert(0, str(script_dir))
+        from logger import StructuredLogger
+    else:
+        # Logger not available - will be None when log_file is requested
+        StructuredLogger = None
+
 
 # Checkpoint constants
 CHECKPOINT_VERSION = "1"
@@ -375,7 +388,7 @@ def clear_checkpoint(state_file: Path, verbose: bool = False) -> None:
             log("WARNING", f"Failed to clear checkpoint: {e}")
 
 
-def run_feature_plan(feature_prompt: str, verbose: bool = False) -> str:
+def run_feature_plan(feature_prompt: str, verbose: bool = False, logger: Optional[Any] = None, model: str = "claude") -> str:
     """
     Run /sdlc:feature to create a plan.
 
@@ -383,16 +396,40 @@ def run_feature_plan(feature_prompt: str, verbose: bool = False) -> str:
     """
     log("PLAN", f"Creating feature plan for: {feature_prompt}")
 
+    if logger:
+        logger.log_event("planning_start", {
+            "feature_prompt": feature_prompt,
+            "model": model,
+        })
+
     prompt = f"/sdlc:feature {feature_prompt}"
-    cmd = ["claude", "--dangerously-skip-permissions", "-p", prompt]
+    cmd = [model, "--dangerously-skip-permissions", "-p", prompt]
 
     if verbose:
         log("PLAN", f"Running: {' '.join(cmd)}")
 
+    if logger:
+        logger.log_command(cmd, start=True)
+
+    import time
+    start_time = time.time()
+
     result = run_command(cmd)
+
+    duration = time.time() - start_time
+
+    if logger:
+        logger.log_command(
+            cmd,
+            output=result.stdout + result.stderr,
+            exit_code=result.returncode,
+            duration=duration
+        )
 
     if result.returncode != 0:
         log("PLAN", f"Error creating plan: {result.stderr}")
+        if logger:
+            logger.log_error("planning_failed", error=result.stderr, exit_code=result.returncode)
         sys.exit(1)
 
     output = result.stdout + result.stderr
@@ -448,9 +485,16 @@ def run_feature_plan(feature_prompt: str, verbose: bool = False) -> str:
     if not plan_path or not plan_exists:
         log("PLAN", "Failed to find created plan file")
         log("PLAN", f"Output was:\n{output}")
+        if logger:
+            logger.log_error("planning_failed", error="Failed to find created plan file", output=output)
         sys.exit(1)
 
     log("PLAN", f"Plan created: {plan_path}")
+    if logger:
+        logger.log_event("planning_complete", {
+            "plan_path": plan_path,
+            "duration": duration,
+        })
     return plan_path
 
 
@@ -479,24 +523,51 @@ def find_ralph_loop_script() -> Optional[Path]:
     return None
 
 
-def run_implement(plan_path: str, verbose: bool = False, max_iterations: int = 0) -> None:
+def run_implement(plan_path: str, verbose: bool = False, max_iterations: int = 0, logger: Optional[Any] = None, model: str = "claude", log_file: Optional[str] = None) -> None:
     """Run ralph-loop to implement the plan iteratively."""
     log("IMPLEMENT", f"Implementing plan with ralph-loop: {plan_path}")
+
+    if logger:
+        logger.log_event("implementation_start", {
+            "plan_path": plan_path,
+            "max_iterations": max_iterations,
+            "model": model,
+        })
 
     ralph_script = find_ralph_loop_script()
     if not ralph_script:
         log("ERROR", "Could not find ralph-loop script. Ensure spawn plugin is installed.")
+        if logger:
+            logger.log_error("implementation_failed", error="Ralph-loop script not found")
         sys.exit(1)
 
-    cmd = [str(ralph_script), "--spec", plan_path]
+    cmd = [str(ralph_script), "--spec", plan_path, "--model", model]
     if max_iterations > 0:
         cmd.extend(["--max-iterations", str(max_iterations)])
+    if log_file:
+        # Pass a separate log file for ralph-loop (append "-ralph" to distinguish)
+        ralph_log = log_file.replace(".log", "-ralph.log") if ".log" in log_file else f"{log_file}-ralph"
+        cmd.extend(["--log", ralph_log])
 
     if verbose:
         log("IMPLEMENT", f"Running: {' '.join(cmd)}")
 
+    if logger:
+        logger.log_command(cmd, start=True)
+
     # Run ralph-loop without capturing output so user sees progress
+    import time
+    start_time = time.time()
+
     result = run_command(cmd, capture_output=False)
+
+    duration = time.time() - start_time
+
+    if logger:
+        logger.log_event("implementation_complete", {
+            "exit_code": result.returncode,
+            "duration": duration,
+        })
 
     if result.returncode != 0:
         log("IMPLEMENT", f"Ralph loop exited with code: {result.returncode}")
@@ -1015,11 +1086,14 @@ def run_review(verbose: bool = False, num_reviewers: int = 0) -> tuple[int, str]
     return result.returncode, output
 
 
-def triage_and_fix_issues(review_output: str, verbose: bool = False) -> None:
+def triage_and_fix_issues(review_output: str, verbose: bool = False, logger: Optional[Any] = None, model: str = "claude") -> None:
     """
     Triage review findings and fix real issues or add comments for false positives.
     """
     log("TRIAGE", "Analyzing and addressing review findings...")
+
+    if logger:
+        logger.log_event("triage_start", {"review_output_length": len(review_output)})
 
     triage_prompt = f"""# Code Review Triage and Fix
 
@@ -1057,18 +1131,38 @@ For each finding above:
 Begin analyzing and fixing the findings now.
 """
 
-    cmd = ["claude", "--dangerously-skip-permissions", "-p", triage_prompt]
+    cmd = [model, "--dangerously-skip-permissions", "-p", triage_prompt]
 
     if verbose:
         log("TRIAGE", f"Running: {' '.join(cmd)}")
 
+    if logger:
+        logger.log_command(cmd, start=True)
+
+    import time
+    start_time = time.time()
+
     result = run_command(cmd)
+
+    duration = time.time() - start_time
+
+    if logger:
+        logger.log_command(
+            cmd,
+            output=result.stdout + result.stderr,
+            exit_code=result.returncode,
+            duration=duration
+        )
 
     if result.returncode != 0:
         log("TRIAGE", f"Error during triage: {result.stderr}")
+        if logger:
+            logger.log_error("triage_failed", error=result.stderr, exit_code=result.returncode)
         # Don't exit - continue with the loop and try review again
     else:
         log("TRIAGE", "Triage and fixes complete")
+        if logger:
+            logger.log_event("triage_complete", {"duration": duration})
 
 
 def main() -> None:
@@ -1276,6 +1370,22 @@ Configuration:
             log("INFO", f"Found existing checkpoint: {state_file}")
             log("INFO", "Use --resume to continue from checkpoint, or --no-resume to start fresh")
 
+    # Initialize logger if log file is provided
+    logger = None
+    if args.log_file:
+        if StructuredLogger is None:
+            log("WARNING", "Logger module not available - logging will be disabled")
+        else:
+            try:
+                logger = StructuredLogger(args.log_file)
+                logger.log_event("initialization", {
+                    "message": "Feature loop started",
+                    "feature_prompt": feature_prompt,
+                })
+            except Exception as e:
+                log("WARNING", f"Failed to initialize logger: {e} - continuing without logging")
+                logger = None
+
     # Print header
     print()
     print("=" * 50)
@@ -1288,7 +1398,25 @@ Configuration:
     log("CONFIG", f"Skip review: {args.skip_review}")
     log("CONFIG", f"Num reviewers: {args.num_reviewers} (0=acr default)")
     log("CONFIG", f"Verbose: {args.verbose}")
+    log("CONFIG", f"Model: {args.model}")
+    if args.log_file:
+        log("CONFIG", f"Log file: {args.log_file}")
     print()
+
+    # Log configuration snapshot
+    if logger:
+        logger.log_config({
+            "feature_prompt": feature_prompt,
+            "model": args.model,
+            "max_implement_iterations": args.max_implement_iterations,
+            "max_review_iterations": args.max_review_iterations,
+            "skip_review": args.skip_review,
+            "num_reviewers": args.num_reviewers,
+            "verbose": args.verbose,
+            "log_file": args.log_file,
+            "resuming": resuming,
+            "checkpoint_phase": checkpoint_state["phase"] if checkpoint_state else None,
+        })
 
     # Step 1: Create the plan
     if resuming and checkpoint_state["phase"] != "planning":
@@ -1300,7 +1428,7 @@ Configuration:
         print("-" * 50)
         print("  Phase 1: Planning")
         print("-" * 50)
-        plan_path = run_feature_plan(feature_prompt, args.verbose)
+        plan_path = run_feature_plan(feature_prompt, args.verbose, logger=logger, model=args.model)
 
         # Save checkpoint after planning
         current_config = {
@@ -1348,7 +1476,7 @@ Configuration:
             # Not a git repo or git error - continue without tracking
             pass
 
-        run_implement(plan_path, args.verbose, args.max_implement_iterations)
+        run_implement(plan_path, args.verbose, args.max_implement_iterations, logger=logger, model=args.model, log_file=args.log_file)
 
         # Generate and display implementation summary
         parsed_impl_data = parse_implementation_results(plan_path)
@@ -1413,7 +1541,7 @@ Configuration:
             elif exit_code == 1:
                 # Issues found - triage and fix
                 log("LOOP", "Triaging and fixing issues...")
-                triage_and_fix_issues(review_output, args.verbose)
+                triage_and_fix_issues(review_output, args.verbose, logger=logger, model=args.model)
 
                 # Save checkpoint after review iteration
                 checkpoint_state["review_iteration"] = iteration
@@ -1445,6 +1573,11 @@ Configuration:
     print()
     log("DONE", f"Plan file: {plan_path}")
     log("DONE", "Feature loop finished successfully!")
+
+    # Close logger if it was initialized
+    if logger:
+        logger.log_event("feature_loop_complete", {"status": "success"})
+        logger.close()
 
     # Clear checkpoint on successful completion
     state_file = get_state_file_path(feature_prompt)
