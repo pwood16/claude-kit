@@ -698,6 +698,201 @@ def format_acr_summary(parsed_data: dict[str, Any], iteration: int) -> str:
     return "\n".join(lines)
 
 
+def get_progress_file_path(spec_file: Path) -> Path:
+    """
+    Get the path to the progress file for a given spec file.
+
+    Args:
+        spec_file: Path to the spec file
+
+    Returns:
+        Path to the progress file
+    """
+    spec_name = spec_file.stem
+    return Path(f"{spec_name}-progress.txt")
+
+
+def parse_implementation_results(spec_file: Path) -> dict[str, Any]:
+    """
+    Parse implementation results from progress file and spec file.
+
+    Args:
+        spec_file: Path to the spec file
+
+    Returns:
+        Dict with:
+        - iterations_run: Number of iterations in progress file
+        - total_tasks: Total number of tasks in spec
+        - completed_tasks: Number of completed tasks
+        - incomplete_tasks: Number of incomplete tasks
+    """
+    # Count iterations from progress file
+    progress_file = get_progress_file_path(spec_file)
+    iterations_run = 0
+
+    if progress_file.exists():
+        content = progress_file.read_text()
+        # Count "Iteration N Summary" or "### Iteration N" patterns
+        import re
+        iteration_patterns = [
+            r'Iteration\s+\d+\s+Summary',
+            r'###\s+Iteration\s+\d+',
+        ]
+        for pattern in iteration_patterns:
+            matches = re.findall(pattern, content)
+            if matches:
+                iterations_run = max(iterations_run, len(matches))
+
+    # Parse spec file to count tasks
+    total_tasks = 0
+    completed_tasks = 0
+
+    if spec_file.suffix == ".json":
+        # JSON spec format
+        import json
+        try:
+            with spec_file.open() as f:
+                spec_data = json.load(f)
+
+            if "stories" in spec_data:
+                for story in spec_data["stories"]:
+                    total_tasks += 1
+                    status = story.get("status", "").lower()
+                    if status in ["complete", "done"]:
+                        completed_tasks += 1
+        except (json.JSONDecodeError, KeyError):
+            pass
+    else:
+        # Markdown spec format
+        content = spec_file.read_text()
+        lines = content.split("\n")
+
+        in_tasks = False
+        for i, line in enumerate(lines):
+            # Look for "Step by Step Tasks" or similar header
+            if "step by step" in line.lower() and "task" in line.lower():
+                in_tasks = True
+                continue
+
+            if in_tasks:
+                # Look for h3 headings (### )
+                if line.strip().startswith("### "):
+                    total_tasks += 1
+                    # Check if next line has "**Status:** complete"
+                    if i + 1 < len(lines):
+                        next_line = lines[i + 1].strip()
+                        if "**status:**" in next_line.lower() and "complete" in next_line.lower():
+                            completed_tasks += 1
+
+    incomplete_tasks = total_tasks - completed_tasks
+
+    return {
+        "iterations_run": iterations_run,
+        "total_tasks": total_tasks,
+        "completed_tasks": completed_tasks,
+        "incomplete_tasks": incomplete_tasks,
+    }
+
+
+def get_implementation_file_changes(before_commit: str, after_commit: str = "HEAD") -> list[str]:
+    """
+    Get list of files modified during implementation phase.
+
+    Args:
+        before_commit: Git commit/ref before implementation
+        after_commit: Git commit/ref after implementation (default: HEAD)
+
+    Returns:
+        List of file paths that were modified
+    """
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--name-only", before_commit, after_commit],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        files = [f for f in result.stdout.strip().split("\n") if f]
+        return files
+    except subprocess.CalledProcessError:
+        # Git error - return empty list
+        return []
+
+
+def format_implementation_summary(
+    parsed_data: dict[str, Any],
+    modified_files: list[str]
+) -> str:
+    """
+    Format implementation phase summary for display.
+
+    Args:
+        parsed_data: Parsed implementation results from parse_implementation_results()
+        modified_files: List of files modified during implementation
+
+    Returns:
+        Formatted summary string with colors and visual separators
+    """
+    lines = []
+    timestamp = format_timestamp()
+
+    # Header with separator
+    lines.append("")
+    lines.append(format_separator("=", 70))
+    lines.append(f"Implementation Phase Complete - {timestamp}")
+    lines.append(format_separator("=", 70))
+    lines.append("")
+
+    # Iteration count
+    iterations = parsed_data["iterations_run"]
+    lines.append(f"Total Iterations: {BLUE}{iterations}{RESET}")
+    lines.append("")
+
+    # Task completion status
+    total = parsed_data["total_tasks"]
+    completed = parsed_data["completed_tasks"]
+    incomplete = parsed_data["incomplete_tasks"]
+
+    if incomplete == 0:
+        status_color = GREEN
+        status_text = f"All {total} task(s) completed ✓"
+    else:
+        status_color = YELLOW
+        status_text = f"{completed} of {total} task(s) completed ({incomplete} remaining)"
+
+    lines.append(f"Tasks Completed: {status_color}{status_text}{RESET}")
+    lines.append("")
+
+    # Files modified
+    if modified_files:
+        lines.append("Files Modified:")
+        files_to_show = modified_files[:10]  # Limit to first 10 files
+        for file_path in files_to_show:
+            lines.append(f"  {BLUE}- {file_path}{RESET}")
+
+        if len(modified_files) > 10:
+            remaining = len(modified_files) - 10
+            lines.append(f"  ... and {remaining} more file(s)")
+        lines.append("")
+    else:
+        lines.append(f"{YELLOW}No files modified during implementation{RESET}")
+        lines.append("")
+
+    # Overall status
+    if incomplete == 0:
+        overall_status = f"{GREEN}Status: Ready for review{RESET}"
+    else:
+        overall_status = f"{YELLOW}Status: Some tasks incomplete - review may be needed{RESET}"
+
+    lines.append(overall_status)
+    lines.append("")
+    lines.append(format_separator("=", 70))
+
+    return "\n".join(lines)
+
+
 def run_review(verbose: bool = False, num_reviewers: int = 0) -> tuple[int, str]:
     """
     Run acr --local to perform code review.
@@ -1035,7 +1230,32 @@ Configuration:
         print("-" * 50)
         print("  Phase 2: Implementation (Ralph Loop)")
         print("-" * 50)
+
+        # Capture git state before implementation
+        import subprocess
+        before_commit = None
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            before_commit = result.stdout.strip()
+        except subprocess.CalledProcessError:
+            # Not a git repo or git error - continue without tracking
+            pass
+
         run_implement(plan_path, args.verbose, args.max_implement_iterations)
+
+        # Generate and display implementation summary
+        parsed_impl_data = parse_implementation_results(plan_path)
+        modified_files = []
+        if before_commit:
+            modified_files = get_implementation_file_changes(before_commit)
+
+        impl_summary = format_implementation_summary(parsed_impl_data, modified_files)
+        print(impl_summary)
 
         # Save checkpoint after implementation
         checkpoint_state["phase"] = "reviewing"

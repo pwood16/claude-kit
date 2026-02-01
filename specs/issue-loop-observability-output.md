@@ -176,6 +176,7 @@ IMPORTANT: Execute every step in order, top to bottom.
   - If exit code is 1 (findings), the summary shows issues before calling triage
 
 ### Step 9: Add ralph-loop completion summary to feature-loop
+**Status:** complete
 - After `run_implement()` completes (line ~807), parse the implementation results:
   - Read the progress file to count how many iterations were run
   - Use spec file to determine total tasks and completed tasks
