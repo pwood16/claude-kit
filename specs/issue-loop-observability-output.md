@@ -192,6 +192,7 @@ IMPORTANT: Execute every step in order, top to bottom.
 - Print this summary before moving to review phase
 
 ### Step 10: Add command-line flags for summary control
+**Status:** complete
 - Add `--summary-only` flag to ralph-loop:
   - When enabled, suppress verbose Claude output (redirect stdout of subprocess to /dev/null or capture without printing)
   - Still show summaries after each iteration
@@ -203,6 +204,7 @@ IMPORTANT: Execute every step in order, top to bottom.
 - Update argparse configuration in both scripts
 
 ### Step 11: Update progress file logging
+**Status:** complete
 - Ensure all iteration summaries in ralph-loop are written to progress file with timestamps
 - Use clear section headers like `=== Iteration N Summary ===`
 - Ensure ACR summaries in feature-loop could be logged (add optional logging)

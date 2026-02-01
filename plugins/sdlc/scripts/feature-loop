@@ -712,6 +712,45 @@ def get_progress_file_path(spec_file: Path) -> Path:
     return Path(f"{spec_name}-progress.txt")
 
 
+def get_feature_loop_log_path(feature_prompt: str) -> Path:
+    """
+    Get the path to the feature-loop log file for a given feature prompt.
+
+    Args:
+        feature_prompt: The feature description
+
+    Returns:
+        Path to the log file
+    """
+    # Use a sanitized version of the feature prompt for the log filename
+    # (similar to how checkpoint state file is named)
+    safe_name = feature_prompt[:50].replace(" ", "-").replace("/", "-")
+    return Path(f".feature-loop-{safe_name}.log")
+
+
+def log_summary_to_file(log_path: Path, summary: str) -> None:
+    """
+    Append a summary to the feature-loop log file (without color codes).
+
+    Args:
+        log_path: Path to log file
+        summary: Summary string (may contain ANSI color codes)
+    """
+    # Strip ANSI color codes for file storage
+    summary_plain = summary
+    for code in [GREEN, YELLOW, RED, BLUE, RESET]:
+        summary_plain = summary_plain.replace(code, "")
+
+    try:
+        with open(log_path, "a") as f:
+            f.write("\n")
+            f.write(summary_plain)
+            f.write("\n")
+    except Exception as e:
+        # Don't fail if logging fails - just skip it
+        pass
+
+
 def parse_implementation_results(spec_file: Path) -> dict[str, Any]:
     """
     Parse implementation results from progress file and spec file.
@@ -1257,6 +1296,10 @@ Configuration:
         impl_summary = format_implementation_summary(parsed_impl_data, modified_files)
         print(impl_summary)
 
+        # Log implementation summary to file
+        log_path = get_feature_loop_log_path(feature_prompt)
+        log_summary_to_file(log_path, impl_summary)
+
         # Save checkpoint after implementation
         checkpoint_state["phase"] = "reviewing"
         checkpoint_state["review_iteration"] = 0
@@ -1289,6 +1332,10 @@ Configuration:
             print()
             print(acr_summary)
             print()
+
+            # Log ACR summary to file
+            log_path = get_feature_loop_log_path(feature_prompt)
+            log_summary_to_file(log_path, acr_summary)
 
             if exit_code == 0:
                 # LGTM - no issues found
