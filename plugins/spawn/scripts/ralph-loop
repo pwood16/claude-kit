@@ -488,6 +488,16 @@ Examples:
         default="TASK COMPLETE",
         help='String to detect completion (default: "TASK COMPLETE")'
     )
+    parser.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="Show only iteration summaries, suppress verbose Claude output"
+    )
+    parser.add_argument(
+        "--no-summaries",
+        action="store_true",
+        help="Disable iteration summaries (for backwards compatibility)"
+    )
 
     args = parser.parse_args()
 
@@ -759,9 +769,15 @@ def check_completion_promise(output: str, promise: str) -> bool:
     return promise in output
 
 
-def run_claude_iteration(prompt: str, progress_file: Path, iteration: int) -> tuple[int, str]:
+def run_claude_iteration(prompt: str, progress_file: Path, iteration: int, summary_only: bool = False) -> tuple[int, str]:
     """
     Run a single Claude iteration with the given prompt.
+
+    Args:
+        prompt: The prompt to send to Claude
+        progress_file: Path to progress file (unused, kept for compatibility)
+        iteration: Iteration number
+        summary_only: If True, suppress verbose Claude output (only capture, don't print)
 
     Returns: (exit_code, output)
     """
@@ -784,7 +800,9 @@ def run_claude_iteration(prompt: str, progress_file: Path, iteration: int) -> tu
         output_lines = []
         with open(tmp_path, "w") as tmp_file:
             for line in process.stdout:
-                print(line, end="", flush=True)
+                # Only print if not in summary-only mode
+                if not summary_only:
+                    print(line, end="", flush=True)
                 tmp_file.write(line)
                 output_lines.append(line)
 
@@ -915,7 +933,7 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
 
         # Run Claude iteration
         print("Running Claude...")
-        exit_code, output = run_claude_iteration(prompt, progress_file, iteration)
+        exit_code, output = run_claude_iteration(prompt, progress_file, iteration, args.summary_only)
 
         # Capture git status after iteration
         after_files = get_git_status()
@@ -941,28 +959,29 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
         # Commit any changes
         commit_changes(spec_name, iteration)
 
-        # Generate and display iteration summary
-        print()
-        summary = generate_iteration_summary(
-            iteration=iteration,
-            spec_format=spec_format,
-            spec_file=spec_file,
-            file_changes=file_changes,
-            exit_code=exit_code
-        )
-        print(summary)
-        print()
+        # Generate and display iteration summary (unless disabled)
+        if not args.no_summaries:
+            print()
+            summary = generate_iteration_summary(
+                iteration=iteration,
+                spec_format=spec_format,
+                spec_file=spec_file,
+                file_changes=file_changes,
+                exit_code=exit_code
+            )
+            print(summary)
+            print()
 
-        # Append summary to progress file (without color codes)
-        # Remove ANSI color codes for file storage
-        summary_plain = summary
-        for color_code in [GREEN, YELLOW, RED, BLUE, RESET]:
-            summary_plain = summary_plain.replace(color_code, "")
+            # Append summary to progress file (without color codes)
+            # Remove ANSI color codes for file storage
+            summary_plain = summary
+            for color_code in [GREEN, YELLOW, RED, BLUE, RESET]:
+                summary_plain = summary_plain.replace(color_code, "")
 
-        with open(progress_file, "a") as f:
-            f.write("\n")
-            f.write(summary_plain)
-            f.write("\n")
+            with open(progress_file, "a") as f:
+                f.write("\n")
+                f.write(summary_plain)
+                f.write("\n")
 
         # Sleep between iterations
         time.sleep(2)
