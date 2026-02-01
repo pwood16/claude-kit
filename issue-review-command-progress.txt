@@ -362,3 +362,67 @@ Progress: 6 of 15 tasks complete
 ### Iteration 7 - $(date '+%Y-%m-%d %H:%M:%S')
 
 Status: Completed
+
+======================================================================
+Iteration 6 Summary - 2026-02-01 10:17:42
+======================================================================
+
+Task: Step 7: Create the /sdlc:review command definition
+
+Status: ○ Incomplete
+
+Files changed: 3
+  Modified (3):
+    ~ ssue-review-command-progress.txt
+    ~ plugins/sdlc/scripts/review-loop
+    ~ specs/issue-review-command.md
+
+Exit status: Success
+
+Progress: 6 of 15 tasks complete
+
+======================================================================
+
+### Iteration 7 - 2026-02-01 10:17:44
+
+**Task Completed:** Step 7 - Create the /sdlc:review command definition
+
+**What was done:**
+- Created `plugins/sdlc/commands/review.md` command definition file
+- Followed the pattern from existing commands (feature.md, bug.md, implement.md, chore.md)
+- Included comprehensive instructions for:
+  - Parsing command arguments from $ARGUMENTS
+  - Invoking the review-loop script with appropriate flags
+  - Displaying results to the user
+  - Usage examples (basic and advanced)
+- Documented all command-line options:
+  - `--max-iterations`, `-m`: Maximum review/fix cycles
+  - `--num-reviewers`, `-r`: Number of ACR reviewers
+  - `--model`: Model to use for triage
+  - `--verbose`, `-v`: Enable verbose logging
+  - `--log`, `--log-file`: Path to log file
+- Provided "How It Works" section explaining the review loop process
+- Added configuration documentation for `.claude-kit` files with precedence order
+- Included example `.claude-kit` configuration JSON
+- Added reporting guidelines for after the review completes
+- Marked Step 7 as complete in the spec
+
+**Learnings:**
+- Command files in the SDLC plugin are markdown prompt files that guide Claude's behavior
+- The pattern is to provide clear instructions, usage examples, and configuration details
+- Commands receive arguments via `$ARGUMENTS` variable that needs to be parsed
+- Commands should invoke the underlying script and display results
+- Documentation within the command file helps Claude understand the full workflow
+- The command file serves as both the execution prompt and inline documentation
+- Following the existing command patterns ensures consistency across the plugin
+
+**Issues encountered:**
+None. Step completed successfully.
+
+**Next steps:**
+- Step 8: Update plugin documentation
+
+Status: Completed
+
+======================================================================
+Status: Completed

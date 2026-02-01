@@ -157,6 +157,7 @@ Create the review-loop script with the following capabilities:
 - Include timestamp and iteration number in log entries
 
 ### Step 7: Create the /sdlc:review command definition
+**Status:** complete
 - Create `plugins/sdlc/commands/review.md` with command prompt
 - Follow the pattern from other commands (feature.md, bug.md, implement.md)
 - Include instructions to:
