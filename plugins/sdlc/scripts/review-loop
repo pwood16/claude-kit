@@ -506,6 +506,29 @@ def run_review(verbose: bool = False, num_reviewers: int = 0) -> tuple[int, str]
     return result.returncode, output
 
 
+def log_summary_to_file(log_path: Path, summary: str) -> None:
+    """
+    Append a summary to the review-loop log file (without color codes).
+
+    Args:
+        log_path: Path to log file
+        summary: Summary string (may contain ANSI color codes)
+    """
+    # Strip ANSI color codes for file storage
+    summary_plain = summary
+    for code in [GREEN, YELLOW, RED, BLUE, RESET]:
+        summary_plain = summary_plain.replace(code, "")
+
+    try:
+        with open(log_path, "a") as f:
+            f.write("\n")
+            f.write(summary_plain)
+            f.write("\n")
+    except Exception as e:
+        # Don't fail if logging fails - just skip it
+        pass
+
+
 def triage_and_fix_issues(review_output: str, verbose: bool = False, model: str = "claude") -> None:
     """
     Triage review findings and fix real issues or add comments for false positives.
@@ -658,14 +681,16 @@ def main() -> int:
         # Flag not set, use config value
         verbose = review_loop_config["verbose"]
 
+    # Determine log file path
+    log_file = Path(args.log_file) if args.log_file else Path(".review-loop.log")
+
     # Display final configuration
     print(f"Review Loop Configuration:")
     print(f"  Max iterations: {max_iterations}")
     print(f"  Number of reviewers: {num_reviewers}")
     print(f"  Model: {model}")
     print(f"  Verbose: {verbose}")
-    if args.log_file:
-        print(f"  Log file: {args.log_file}")
+    print(f"  Log file: {log_file}")
     print()
 
     if verbose:
@@ -693,6 +718,9 @@ def main() -> int:
         summary = format_acr_summary(parsed_data, iteration)
         print(summary)
         print()
+
+        # Log summary to file
+        log_summary_to_file(log_file, summary)
 
         # Check exit code
         if exit_code == 0:

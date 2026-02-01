@@ -283,3 +283,82 @@ None. Step completed successfully.
 
 Status: Completed
 Status: Completed
+
+======================================================================
+Iteration 5 Summary - 2026-02-01 10:16:27
+======================================================================
+
+Task: Step 6: Add logging support
+
+Status: ○ Incomplete
+
+Files changed: 3
+  Modified (3):
+    ~ ssue-review-command-progress.txt
+    ~ plugins/sdlc/scripts/review-loop
+    ~ specs/issue-review-command.md
+
+Exit status: Success
+
+Progress: 5 of 15 tasks complete
+
+======================================================================
+
+### Iteration 6 - 2026-02-01 10:16:29
+
+**Task Completed:** Step 6 - Add logging support
+
+**What was done:**
+- Copied `log_summary_to_file()` function from feature-loop (lines 849-869)
+- The function:
+  - Strips ANSI color codes from summary before writing to file
+  - Appends summary to log file with newlines for separation
+  - Handles errors gracefully (doesn't fail if logging fails)
+- Updated main() function to:
+  - Determine log file path (CLI arg --log/--log-file or default to `.review-loop.log`)
+  - Display log file path in configuration summary
+  - Call log_summary_to_file() after each review summary is displayed
+- All review summaries (with iteration number and timestamp) are now logged to file
+- Tested Python syntax validation - passes successfully
+- Tested help output - works correctly
+
+**Learnings:**
+- The log_summary_to_file function follows defensive programming - doesn't halt execution on log errors
+- Color codes are stripped before writing to file for clean, readable logs
+- The log file defaults to `.review-loop.log` in the current directory (consistent with feature-loop pattern)
+- Users can override the log file path with --log or --log-file argument
+- Each summary is appended with newlines before and after for visual separation
+- The format_acr_summary function already includes timestamp and iteration number, so no additional formatting needed
+- Log file path is now displayed in the configuration summary for user visibility
+- The log file accumulates summaries across multiple runs (append mode)
+
+**Issues encountered:**
+None. Step completed successfully by reusing the pattern from feature-loop.
+
+**Next steps:**
+- Step 7: Create the /sdlc:review command definition
+
+Status: Completed
+
+======================================================================
+Iteration 6 Summary - $(date '+%Y-%m-%d %H:%M:%S')
+======================================================================
+
+Task: Step 7: Create the /sdlc:review command definition
+
+Status: ○ Incomplete
+
+Files changed: 2
+  Modified (2):
+    ~ plugins/sdlc/scripts/review-loop
+    ~ specs/issue-review-command.md
+
+Exit status: Success
+
+Progress: 6 of 15 tasks complete
+
+======================================================================
+
+### Iteration 7 - $(date '+%Y-%m-%d %H:%M:%S')
+
+Status: Completed

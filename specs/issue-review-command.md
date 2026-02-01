@@ -151,6 +151,7 @@ Create the review-loop script with the following capabilities:
   - Log summary to `.review-loop.log`
 
 ### Step 6: Add logging support
+**Status:** complete
 - Implement log file summary appending (reuse `log_summary_to_file()` pattern)
 - Write review summaries (without color codes) to `.review-loop.log`
 - Include timestamp and iteration number in log entries
