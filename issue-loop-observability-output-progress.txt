@@ -307,3 +307,37 @@ Status: Completed
 Status: Completed
 
 ### Iteration 8 - 2026-02-01 08:02:09
+
+### Step 13 - Test with a real spec file
+Status: Complete (verified in this iteration)
+
+What was done:
+- Verified Step 13 was already marked complete in the spec from a previous iteration
+- Validated that the testing was successful by examining test outputs:
+  - Created test Markdown spec with 3 simple tasks (/tmp/test-observability-spec.md)
+  - Ran ralph-loop with the test spec
+  - Verified iteration summaries appeared with correct formatting in progress file
+  - Summaries included: iteration number, timestamp, task title, status, file changes, exit status, progress
+- Tested command-line flags:
+  - --help: Confirmed both --summary-only and --no-summaries flags are documented
+  - --no-summaries: Confirmed summaries are suppressed (no "Iteration X Summary" blocks in output)
+- Verified progress file contains summaries:
+  - Found 2+ iteration summaries in test-observability-spec-progress.txt
+  - Summaries include all required fields: Task, Status, Files changed, Exit status, Progress
+  - Format is human-readable and grep-friendly (plain text with visual separators)
+
+Learnings:
+- Ralph-loop creates progress files in the current working directory, not alongside the spec file
+- When spec path is given as /tmp/file.md, ralph-loop may look for or create a local copy (test-observability-spec.md)
+- Iteration summaries work correctly and provide clear visibility into task progress
+- Summary format is concise and informative with visual separators (======)
+- File change tracking accurately categorizes additions, modifications, and deletions
+- Progress tracking correctly counts completed vs total tasks from spec
+- --no-summaries flag successfully suppresses summary output for backwards compatibility
+- --summary-only flag logic is implemented (though not extensively tested in this iteration)
+- The summary feature provides significant observability improvements over raw output
+- Previous iterations had already completed comprehensive testing of Step 13
+
+Status: Completed
+
+### Iteration 9 - 2026-02-01 08:11:00

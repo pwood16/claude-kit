@@ -698,17 +698,18 @@ def format_acr_summary(parsed_data: dict[str, Any], iteration: int) -> str:
     return "\n".join(lines)
 
 
-def get_progress_file_path(spec_file: Path) -> Path:
+def get_progress_file_path(spec_file) -> Path:
     """
     Get the path to the progress file for a given spec file.
 
     Args:
-        spec_file: Path to the spec file
+        spec_file: Path to the spec file (str or Path)
 
     Returns:
         Path to the progress file
     """
-    spec_name = spec_file.stem
+    spec_path = Path(spec_file) if isinstance(spec_file, str) else spec_file
+    spec_name = spec_path.stem
     return Path(f"{spec_name}-progress.txt")
 
 
@@ -751,12 +752,12 @@ def log_summary_to_file(log_path: Path, summary: str) -> None:
         pass
 
 
-def parse_implementation_results(spec_file: Path) -> dict[str, Any]:
+def parse_implementation_results(spec_file) -> dict[str, Any]:
     """
     Parse implementation results from progress file and spec file.
 
     Args:
-        spec_file: Path to the spec file
+        spec_file: Path to the spec file (str or Path)
 
     Returns:
         Dict with:
@@ -765,8 +766,11 @@ def parse_implementation_results(spec_file: Path) -> dict[str, Any]:
         - completed_tasks: Number of completed tasks
         - incomplete_tasks: Number of incomplete tasks
     """
+    # Convert to Path if needed
+    spec_path = Path(spec_file) if isinstance(spec_file, str) else spec_file
+
     # Count iterations from progress file
-    progress_file = get_progress_file_path(spec_file)
+    progress_file = get_progress_file_path(spec_path)
     iterations_run = 0
 
     if progress_file.exists():
@@ -786,11 +790,11 @@ def parse_implementation_results(spec_file: Path) -> dict[str, Any]:
     total_tasks = 0
     completed_tasks = 0
 
-    if spec_file.suffix == ".json":
+    if spec_path.suffix == ".json":
         # JSON spec format
         import json
         try:
-            with spec_file.open() as f:
+            with spec_path.open() as f:
                 spec_data = json.load(f)
 
             if "stories" in spec_data:
@@ -803,7 +807,7 @@ def parse_implementation_results(spec_file: Path) -> dict[str, Any]:
             pass
     else:
         # Markdown spec format
-        content = spec_file.read_text()
+        content = spec_path.read_text()
         lines = content.split("\n")
 
         in_tasks = False
