@@ -149,6 +149,7 @@ Update all Claude CLI invocations to use the configurable model parameter and lo
 - Update ralph-loop invocations (line 452) to pass model and log file parameters
 
 ### Update All Claude CLI Invocations
+**Status:** complete
 - Search for all `["claude",` command constructions
 - Replace with model-aware construction: `[model, "--dangerously-skip-permissions", ...]`
 - Ensure all paths support model parameter propagation

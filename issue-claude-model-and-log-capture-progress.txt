@@ -494,3 +494,105 @@ The feature-loop logging integration is complete. The next task is to update all
 
 Status: Completed
 Status: Completed
+
+======================================================================
+Iteration 6 Summary - 2026-02-01 09:38:49
+======================================================================
+
+Task: Update All Claude CLI Invocations
+
+Status: ○ Incomplete
+
+Files changed: 3
+  Modified (3):
+    ~ specs/issue-claude-model-and-log-capture.md
+    ~ ssue-claude-model-and-log-capture-progress.txt
+    ~ plugins/sdlc/scripts/feature-loop
+
+Exit status: Success
+
+Progress: 6 of 9 tasks complete
+
+======================================================================
+
+### Iteration 7 - 2026-02-01 09:38:51
+
+**Task Completed:** Update All Claude CLI Invocations
+
+**What was done:**
+1. Updated `plugins/spawn/scripts/ralph-loop` (without .py extension) which is the actual ralph-loop script used by feature-loop:
+   - Added `--model` and `--log` / `--log-file` CLI arguments to argument parser
+   - Updated docstring and epilog with examples showing new parameters
+   - Added import for StructuredLogger with fallback error handling
+   
+2. Updated `run_claude_iteration()` function in ralph-loop:
+   - Added `model` parameter (default: "claude") to accept configurable model
+   - Added optional `logger` parameter (default: None) for structured logging
+   - Replaced hardcoded `["claude", ...]` with `[model, ...]` in command construction
+   - Added timing tracking with start_time and duration calculation
+   - Added command execution start logging (when logger is enabled)
+   - Added command execution completion logging with full output, exit code, and duration
+   - Added exception handling with error logging
+   - Wrapped command execution in try-except block to log errors with full context
+
+3. Updated `run_ralph_loop()` function:
+   - Extracted `model` and `log_file` from args at function start
+   - Added logger initialization when `log_file` is provided
+   - Handles initialization errors gracefully with warning (continues without logging)
+   - Updated header output to display model and log file (when enabled)
+   - Added configuration snapshot logging with all run parameters
+   - Added logging at key loop events:
+     - Max iterations reached
+     - All tasks complete
+     - Iteration start with pending count
+     - Iteration end (success or failure) with duration
+     - Completion promise detection
+   - Added logger.close() call at end of function to write final metadata
+   - Updated `run_claude_iteration()` call site to pass `model` and `logger` parameters
+
+4. Marked task as complete in spec file by adding `**Status:** complete` line
+
+**Key Design Decisions:**
+- The ralph-loop script (without .py extension) is the actual one used by feature-loop, not ralph-loop.py
+- Both files exist but only ralph-loop (without extension) is referenced in feature-loop's find_ralph_loop_script()
+- Used flexible import mechanism to support different invocation methods (direct script run vs module import)
+- Made all logging conditional (only when logger is provided) to maintain backwards compatibility
+- Changed hardcoded "claude" to use model parameter throughout command construction
+- Log command execution at both start and end for complete trace
+- Captured and logged full command output (with truncation in logger for large outputs)
+- Added exception handling to log errors without breaking execution flow
+- Track iteration duration separately from command duration for complete performance metrics
+- Log configuration snapshot at startup for reproducibility
+- Close logger at end to write final metadata (total duration, success status)
+
+**Issues Encountered:**
+- Initial confusion about which ralph-loop file to update (there are two: ralph-loop and ralph-loop.py)
+- Discovered by searching for hardcoded "claude" strings and finding one in the ralph-loop (without .py) file
+- Verified by checking feature-loop's find_ralph_loop_script() function which looks for "ralph-loop" not "ralph-loop.py"
+
+**Testing Considerations:**
+- The model parameter now flows through to the actual claude CLI invocation
+- Logger captures all key events when enabled
+- Backwards compatibility maintained - works without --log parameter
+- Exception handling ensures errors are logged without breaking the loop
+- Configuration snapshot enables reproducing runs from logs
+- Timing data enables performance analysis
+
+**Verification:**
+The integration is complete and ready for testing. Users can now run:
+```bash
+ralph-loop --spec specs/test.md --model claude --log /tmp/ralph.log
+```
+
+The log file will contain JSONL-formatted events including:
+- Configuration snapshot
+- Iteration start/end with durations
+- Full command executions with outputs
+- Error details with context
+- Final completion status
+
+**Next Steps:**
+All Claude CLI invocations have been updated to use the model parameter. No hardcoded "claude" strings remain in command construction. The next task is to add documentation.
+
+Status: Completed
+Status: Completed

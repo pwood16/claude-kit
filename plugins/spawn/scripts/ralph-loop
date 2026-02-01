@@ -14,13 +14,14 @@ Supports two spec formats:
 Exits when: all tasks complete, max-iterations reached, or completion promise detected.
 
 Usage:
-    ralph-loop --spec <file> [--max-iterations N] [--completion-promise TEXT]
-    ralph-loop --prd <file> [--max-iterations N] [--completion-promise TEXT]  (legacy JSON format)
+    ralph-loop --spec <file> [--max-iterations N] [--completion-promise TEXT] [--model MODEL] [--log FILE]
+    ralph-loop --prd <file> [--max-iterations N] [--completion-promise TEXT] [--model MODEL] [--log FILE]  (legacy JSON format)
 
 Examples:
     ralph-loop --spec specs/feature.md
     ralph-loop --spec specs/feature.json --max-iterations 10
     ralph-loop --prd legacy.json --completion-promise "ALL DONE"
+    ralph-loop --spec specs/feature.md --model claude --log /tmp/ralph.log
 """
 
 import argparse
@@ -34,6 +35,22 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
+
+# Try to import StructuredLogger
+try:
+    from lib.logger import StructuredLogger
+except ImportError:
+    # Try adding lib directory to path
+    script_dir = Path(__file__).parent
+    lib_dir = script_dir.parent / "lib"
+    if lib_dir.exists():
+        sys.path.insert(0, str(lib_dir.parent))
+        try:
+            from lib.logger import StructuredLogger
+        except ImportError:
+            StructuredLogger = None
+    else:
+        StructuredLogger = None
 
 
 def log(step: str, message: str) -> None:
@@ -461,6 +478,7 @@ Examples:
     %(prog)s --spec specs/feature.md
     %(prog)s --spec specs/feature.json --max-iterations 10
     %(prog)s --prd legacy.json --completion-promise "ALL DONE"
+    %(prog)s --spec specs/feature.md --model claude --log /tmp/ralph.log
         """
     )
 
@@ -497,6 +515,20 @@ Examples:
         "--no-summaries",
         action="store_true",
         help="Disable iteration summaries (for backwards compatibility)"
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="claude",
+        help="Model to use for agent invocations (default: claude)"
+    )
+    parser.add_argument(
+        "--log",
+        "--log-file",
+        dest="log_file",
+        type=str,
+        default=None,
+        help="Path to log file for detailed execution capture (optional)"
     )
 
     args = parser.parse_args()
@@ -769,7 +801,7 @@ def check_completion_promise(output: str, promise: str) -> bool:
     return promise in output
 
 
-def run_claude_iteration(prompt: str, progress_file: Path, iteration: int, summary_only: bool = False) -> tuple[int, str]:
+def run_claude_iteration(prompt: str, progress_file: Path, iteration: int, summary_only: bool = False, model: str = "claude", logger: Optional[any] = None) -> tuple[int, str]:
     """
     Run a single Claude iteration with the given prompt.
 
@@ -778,10 +810,19 @@ def run_claude_iteration(prompt: str, progress_file: Path, iteration: int, summa
         progress_file: Path to progress file (unused, kept for compatibility)
         iteration: Iteration number
         summary_only: If True, suppress verbose Claude output (only capture, don't print)
+        model: Model to use for invocation (default: "claude")
+        logger: Optional StructuredLogger instance for logging
 
     Returns: (exit_code, output)
     """
-    cmd = ["claude", "--dangerously-skip-permissions", "--verbose", "-p", prompt]
+    import time
+    start_time = time.time()
+
+    cmd = [model, "--dangerously-skip-permissions", "--verbose", "-p", prompt]
+
+    # Log command execution start
+    if logger:
+        logger.log_command("claude_iteration", cmd, "starting")
 
     # Create temp file to capture output while also streaming it
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
@@ -809,7 +850,19 @@ def run_claude_iteration(prompt: str, progress_file: Path, iteration: int, summa
         process.wait()
         output = "".join(output_lines)
 
+        # Log command execution completion
+        duration = time.time() - start_time
+        if logger:
+            logger.log_command("claude_iteration", cmd, "completed",
+                             exit_code=process.returncode, output=output, duration=duration)
+
         return process.returncode, output
+    except Exception as e:
+        # Log errors
+        duration = time.time() - start_time
+        if logger:
+            logger.log_error("claude_iteration", str(e), {"command": cmd, "duration": duration})
+        raise
     finally:
         # Clean up temp file
         try:
@@ -854,6 +907,19 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
     spec_file = Path(args.spec_file)
     max_iterations = args.max_iterations
     completion_promise = args.completion_promise
+    model = args.model
+    log_file = args.log_file
+
+    # Initialize logger if log file is provided
+    logger = None
+    if log_file and StructuredLogger:
+        try:
+            logger = StructuredLogger(log_file)
+            logger.log_event("initialization", {"message": "Ralph loop starting", "spec_file": str(spec_file)})
+        except Exception as e:
+            print(f"Warning: Could not initialize logger: {e}")
+            print("Continuing without logging...")
+            logger = None
 
     # Detect and validate spec format
     try:
@@ -888,7 +954,21 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
     print(f"Progress file:      {progress_file}")
     print(f"Max iterations:     {max_iterations}")
     print(f"Completion promise: {completion_promise}")
+    print(f"Model:              {model}")
+    if log_file:
+        print(f"Log file:           {log_file}")
     print()
+
+    # Log configuration
+    if logger:
+        logger.log_event("configuration", {
+            "spec_file": spec_path,
+            "spec_format": spec_format,
+            "progress_file": str(progress_file),
+            "max_iterations": max_iterations,
+            "completion_promise": completion_promise,
+            "model": model
+        })
 
     iteration = 0
 
@@ -896,6 +976,8 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
         # Check max iterations
         if max_iterations > 0 and iteration >= max_iterations:
             print(f"Max iterations ({max_iterations}) reached.")
+            if logger:
+                logger.log_event("max_iterations_reached", {"max_iterations": max_iterations})
             break
 
         iteration += 1
@@ -912,6 +994,8 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
 
         if pending == 0:
             print("All stories complete! Exiting loop.")
+            if logger:
+                logger.log_event("all_tasks_complete", {"iteration": iteration})
             break
 
         print(f"Pending stories: {pending}")
@@ -921,6 +1005,9 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open(progress_file, "a") as f:
             f.write(f"\n### Iteration {iteration} - {timestamp}\n")
+
+        if logger:
+            logger.log_iteration_start(iteration, {"pending": pending})
 
         # Generate format-specific prompt
         if spec_format == "json":
@@ -933,7 +1020,9 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
 
         # Run Claude iteration
         print("Running Claude...")
-        exit_code, output = run_claude_iteration(prompt, progress_file, iteration, args.summary_only)
+        iteration_start_time = time.time()
+        exit_code, output = run_claude_iteration(prompt, progress_file, iteration, args.summary_only, model, logger)
+        iteration_duration = time.time() - iteration_start_time
 
         # Capture git status after iteration
         after_files = get_git_status()
@@ -946,15 +1035,23 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
             with open(progress_file, "a") as f:
                 f.write("Status: Completed\n")
 
+            if logger:
+                logger.log_iteration_end(iteration, {"status": "success", "exit_code": exit_code, "duration": iteration_duration})
+
             # Check for completion promise
             if check_completion_promise(output, completion_promise):
                 print()
                 print(f"Completion promise detected: '{completion_promise}'")
+                if logger:
+                    logger.log_event("completion_promise", {"promise": completion_promise, "iteration": iteration})
                 break
         else:
             print("Iteration failed")
             with open(progress_file, "a") as f:
                 f.write("Status: Failed\n")
+
+            if logger:
+                logger.log_iteration_end(iteration, {"status": "failed", "exit_code": exit_code, "duration": iteration_duration})
 
         # Commit any changes
         commit_changes(spec_name, iteration)
@@ -999,9 +1096,15 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
 
     if final_pending == 0:
         print("SUCCESS: All stories completed!")
+        if logger:
+            logger.log_event("ralph_loop_complete", {"status": "success", "total_iterations": iteration})
+            logger.close()
         return 0
     else:
         print(f"INCOMPLETE: {final_pending} stories remaining")
+        if logger:
+            logger.log_event("ralph_loop_complete", {"status": "incomplete", "total_iterations": iteration, "pending": final_pending})
+            logger.close()
         return 1
 
 
