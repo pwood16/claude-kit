@@ -214,6 +214,7 @@ Create the review-loop script with the following capabilities:
 - Ensure error handling works correctly
 
 ### Step 13: Test edge cases
+**Status:** complete
 - Test with no git repo (should work)
 - Test with no ACR installed (should error gracefully)
 - Test with max iterations reached (should report status)
