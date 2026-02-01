@@ -1,0 +1,101 @@
+# Progress Log for issue-loop-observability-output
+# Started: 2026-02-01 07:37:22
+
+
+### Iteration 1 - 2026-02-01 07:37:22
+
+### Iteration 1 - 2026-02-01 07:42:17
+
+### Iteration 3 - 2026-02-01 (Current)
+Task: Step 1 - Add output formatting utilities to ralph-loop
+Status: Complete
+
+What was done:
+- Added `supports_color()` function that checks if stdout is a TTY and TERM env var
+- Added color constants (GREEN, YELLOW, RED, BLUE, RESET) that respect color support
+- Added `format_separator()` function to create visual dividers with configurable char and width
+- Added `format_timestamp()` function for consistent timestamp formatting
+- Added `format_iteration_summary()` function skeleton that will be implemented in later steps
+
+Learnings:
+- Color support is automatically disabled when output is piped or TERM=dumb
+- Color constants are evaluated once at module load time based on supports_color()
+- The skeleton for format_iteration_summary() is in place and will be filled in during Step 4
+
+### Step 2 - Add git change tracking to ralph-loop
+Status: Complete
+
+What was done:
+- Added `get_git_status()` function that runs `git status --porcelain` and parses into dict with added/modified/deleted lists
+- Added `diff_file_changes()` function to compute delta between before/after git status
+- Integrated git tracking into main loop: capture before_files before Claude iteration, after_files after iteration
+- Compute file_changes using diff_file_changes() to track what changed during the iteration
+
+Learnings:
+- Git status --porcelain format: XY FILENAME where X=index status, Y=working tree status
+- Handled case where git repo may not exist (returns empty lists)
+- Used set difference to compute newly added/modified/deleted files
+- File changes are now captured and ready to be used in iteration summaries
+
+### Step 3 - Add task extraction utilities to ralph-loop
+Status: Complete
+
+What was done:
+- Added `get_markdown_tasks()` function that parses spec and returns list of (title, status) tuples
+- Added `get_json_stories()` function that parses JSON spec and returns list of (story_id, title, status) tuples
+- Added `find_current_task()` function that finds first incomplete task from a list
+- These functions extract detailed task information beyond just counts
+
+Learnings:
+- Task extraction logic similar to existing check_* functions but returns structured data
+- Status normalization: "complete"/"done" -> "complete", everything else -> "incomplete"
+- find_current_task() works with both markdown and json tuple formats (status is always last element)
+- These utilities will be used to populate iteration summaries with task titles and progress
+
+### Step 4 - Implement iteration summary generation in ralph-loop
+Status: Complete
+
+What was done:
+- Implemented full `format_iteration_summary()` function that formats structured data into a readable summary
+- Added `generate_iteration_summary()` function that gathers all data and calls format_iteration_summary()
+- Summary includes: timestamp, task title, status (color-coded), file changes (grouped and limited to 5 per category), exit status, and progress
+- Used color constants for visual scanning: green for success/complete, yellow for incomplete, red for errors, blue for modifications
+
+Learnings:
+- Summary limits file lists to first 5 entries per category to keep output concise
+- Current task detection: looks for last completed task (assuming it was just done), or first incomplete task
+- Task title extraction differs by format: JSON uses (story_id, title, status), markdown uses (title, status)
+- Generated summaries are both human-readable and visually scannable with colors and separators
+
+### Step 5 - Display iteration summaries in ralph-loop main loop
+Status: Complete
+
+What was done:
+- Integrated summary generation into main loop after commit_changes()
+- Summary is printed to stdout with colors for visual scanning
+- Summary is appended to progress file with ANSI color codes stripped for plain text storage
+- Added blank lines before/after summary for readability
+- Summaries now appear automatically after each iteration
+
+Learnings:
+- Color codes must be stripped before writing to progress file for grep-friendliness
+- Summary appears after commit but before sleep, so user sees complete status before next iteration
+- Both colored (stdout) and plain (file) versions are generated from the same source
+- ralph-loop now provides clear iteration boundaries and progress visibility
+
+=== Iteration Summary ===
+Completed 5 tasks in this iteration:
+1. Added output formatting utilities (color support, separators, timestamp formatting)
+2. Added git change tracking (before/after file status, diff computation)
+3. Added task extraction utilities (get tasks/stories, find current task)
+4. Implemented iteration summary generation (format and generate functions)
+5. Integrated summaries into main loop (display and log)
+
+Overall Progress: 5 of 15 steps complete (33%)
+
+Next Steps:
+- Steps 6-9: Feature-loop integration (ACR summaries, implementation summaries)
+- Step 10: Command-line flags (--summary-only, --no-summaries)
+- Steps 11-12: Progress file logging and documentation updates
+- Steps 13-15: Testing and validation
+Status: Completed

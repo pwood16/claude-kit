@@ -41,6 +41,412 @@ def log(step: str, message: str) -> None:
     print(f"[{step}] {message}", flush=True)
 
 
+# ============================================================================
+# Output Formatting Utilities
+# ============================================================================
+
+def supports_color() -> bool:
+    """
+    Check if terminal supports ANSI color codes.
+
+    Returns: True if colors should be used, False otherwise
+    """
+    # Check if stdout is a terminal
+    if not hasattr(sys.stdout, "isatty") or not sys.stdout.isatty():
+        return False
+
+    # Check TERM environment variable
+    term = os.environ.get("TERM", "")
+    if term == "dumb":
+        return False
+
+    return True
+
+
+# Color code constants
+_USE_COLOR = supports_color()
+GREEN = "\033[32m" if _USE_COLOR else ""
+YELLOW = "\033[33m" if _USE_COLOR else ""
+RED = "\033[31m" if _USE_COLOR else ""
+BLUE = "\033[34m" if _USE_COLOR else ""
+RESET = "\033[0m" if _USE_COLOR else ""
+
+
+def format_separator(char: str = "=", width: int = 70) -> str:
+    """
+    Create a visual divider line.
+
+    Args:
+        char: Character to repeat (default: "=")
+        width: Width of the separator (default: 70)
+
+    Returns: String of repeated characters
+    """
+    return char * width
+
+
+def format_timestamp(dt: Optional[datetime] = None) -> str:
+    """
+    Format a timestamp for consistent display.
+
+    Args:
+        dt: Datetime object (default: now)
+
+    Returns: Formatted timestamp string (YYYY-MM-DD HH:MM:SS)
+    """
+    if dt is None:
+        dt = datetime.now()
+    return dt.strftime("%Y-%m-%d %H:%M:%S")
+
+
+def format_iteration_summary(
+    iteration: int,
+    spec_format: str,
+    task_title: str,
+    task_status: str,
+    files_added: list[str],
+    files_modified: list[str],
+    files_deleted: list[str],
+    exit_code: int,
+    total_tasks: int,
+    completed_tasks: int
+) -> str:
+    """
+    Format an iteration summary with structured data.
+
+    Args:
+        iteration: Iteration number
+        spec_format: "json" or "markdown"
+        task_title: Title of the task being worked on
+        task_status: "complete" or "incomplete"
+        files_added: List of newly added files
+        files_modified: List of modified files
+        files_deleted: List of deleted files
+        exit_code: Exit code of the iteration (0 = success)
+        total_tasks: Total number of tasks in spec
+        completed_tasks: Number of completed tasks
+
+    Returns: Formatted summary string
+    """
+    lines = []
+    timestamp = format_timestamp()
+
+    # Header separator
+    lines.append(format_separator("="))
+    lines.append(f"Iteration {iteration} Summary - {timestamp}")
+    lines.append(format_separator("="))
+    lines.append("")
+
+    # Task being worked on
+    lines.append(f"Task: {task_title}")
+    lines.append("")
+
+    # Task status (color-coded)
+    if task_status == "complete":
+        status_text = f"{GREEN}✓ Complete{RESET}"
+    else:
+        status_text = f"{YELLOW}○ Incomplete{RESET}"
+    lines.append(f"Status: {status_text}")
+    lines.append("")
+
+    # Files changed
+    total_file_changes = len(files_added) + len(files_modified) + len(files_deleted)
+    if total_file_changes == 0:
+        lines.append("Files changed: None")
+    else:
+        lines.append(f"Files changed: {total_file_changes}")
+
+        if files_added:
+            lines.append(f"  {GREEN}Added ({len(files_added)}){RESET}:")
+            for f in files_added[:5]:  # Limit to first 5
+                lines.append(f"    + {f}")
+            if len(files_added) > 5:
+                lines.append(f"    ... and {len(files_added) - 5} more")
+
+        if files_modified:
+            lines.append(f"  {BLUE}Modified ({len(files_modified)}){RESET}:")
+            for f in files_modified[:5]:  # Limit to first 5
+                lines.append(f"    ~ {f}")
+            if len(files_modified) > 5:
+                lines.append(f"    ... and {len(files_modified) - 5} more")
+
+        if files_deleted:
+            lines.append(f"  {RED}Deleted ({len(files_deleted)}){RESET}:")
+            for f in files_deleted[:5]:  # Limit to first 5
+                lines.append(f"    - {f}")
+            if len(files_deleted) > 5:
+                lines.append(f"    ... and {len(files_deleted) - 5} more")
+
+    lines.append("")
+
+    # Exit status
+    if exit_code == 0:
+        exit_status = f"{GREEN}Success{RESET}"
+    else:
+        exit_status = f"{RED}Failed (exit code: {exit_code}){RESET}"
+    lines.append(f"Exit status: {exit_status}")
+    lines.append("")
+
+    # Progress
+    lines.append(f"Progress: {completed_tasks} of {total_tasks} tasks complete")
+    lines.append("")
+
+    # Footer separator
+    lines.append(format_separator("="))
+
+    return "\n".join(lines)
+
+
+# ============================================================================
+# Git Change Tracking Utilities
+# ============================================================================
+
+def get_git_status() -> dict[str, list[str]]:
+    """
+    Get current git status and parse into added/modified/deleted file lists.
+
+    Returns: Dict with keys "added", "modified", "deleted" containing file paths
+    """
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+    except subprocess.CalledProcessError:
+        # Not a git repo or git error - return empty lists
+        return {"added": [], "modified": [], "deleted": []}
+
+    added = []
+    modified = []
+    deleted = []
+
+    for line in result.stdout.strip().split("\n"):
+        if not line:
+            continue
+
+        # Git status --porcelain format:
+        # XY FILENAME
+        # X = status in index, Y = status in working tree
+        # A = added, M = modified, D = deleted, ? = untracked
+        status = line[:2]
+        filepath = line[3:]
+
+        if "?" in status or "A" in status:
+            added.append(filepath)
+        elif "M" in status:
+            modified.append(filepath)
+        elif "D" in status:
+            deleted.append(filepath)
+
+    return {"added": added, "modified": modified, "deleted": deleted}
+
+
+def diff_file_changes(
+    before: dict[str, list[str]],
+    after: dict[str, list[str]]
+) -> dict[str, list[str]]:
+    """
+    Compute the delta between before/after git status.
+
+    Args:
+        before: Git status before iteration
+        after: Git status after iteration
+
+    Returns: Dict with keys "added", "modified", "deleted" showing new changes
+    """
+    # Convert lists to sets for easier comparison
+    before_added = set(before["added"])
+    before_modified = set(before["modified"])
+    before_deleted = set(before["deleted"])
+
+    after_added = set(after["added"])
+    after_modified = set(after["modified"])
+    after_deleted = set(after["deleted"])
+
+    # Compute differences
+    newly_added = list(after_added - before_added)
+    newly_modified = list(after_modified - before_modified)
+    newly_deleted = list(after_deleted - before_deleted)
+
+    return {
+        "added": newly_added,
+        "modified": newly_modified,
+        "deleted": newly_deleted
+    }
+
+
+# ============================================================================
+# Task Extraction Utilities
+# ============================================================================
+
+def get_markdown_tasks(spec_file: Path) -> list[tuple[str, str]]:
+    """
+    Extract all tasks from a Markdown spec with their status.
+
+    Returns: List of (title, status) tuples where status is "complete" or "incomplete"
+    """
+    content = spec_file.read_text()
+    lines = content.split("\n")
+
+    in_tasks = False
+    tasks = []
+    current_task = None
+    prev_was_h3 = False
+
+    for line in lines:
+        # Check for entering Step by Step Tasks section
+        if line.startswith("## Step by Step Tasks"):
+            in_tasks = True
+            continue
+
+        # Check for exiting section (hit another h2)
+        if in_tasks and line.startswith("## ") and not line.startswith("## Step by Step Tasks"):
+            break
+
+        if in_tasks:
+            if line.startswith("### "):
+                # Extract task title (remove ### prefix)
+                title = line[4:].strip()
+                current_task = title
+                tasks.append((title, "incomplete"))
+                prev_was_h3 = True
+            elif prev_was_h3:
+                # Check if this line marks completion
+                if "**Status:**" in line and "complete" in line.lower():
+                    # Update the last task's status
+                    if tasks:
+                        tasks[-1] = (tasks[-1][0], "complete")
+                prev_was_h3 = False
+
+    return tasks
+
+
+def get_json_stories(spec_file: Path) -> list[tuple[str, str, str]]:
+    """
+    Extract all stories from a JSON spec with their status.
+
+    Returns: List of (story_id, title, status) tuples
+    """
+    try:
+        content = spec_file.read_text()
+        data = json.loads(content)
+    except (json.JSONDecodeError, OSError):
+        return []
+
+    stories = data.get("stories", [])
+    result = []
+
+    for story in stories:
+        story_id = story.get("id", "")
+        title = story.get("title", "Untitled")
+        status = story.get("status", "").lower()
+
+        # Normalize status
+        if status in ("complete", "done"):
+            normalized_status = "complete"
+        else:
+            normalized_status = "incomplete"
+
+        result.append((story_id, title, normalized_status))
+
+    return result
+
+
+def find_current_task(tasks: list[tuple]) -> Optional[tuple]:
+    """
+    Find the first incomplete task from a list of tasks.
+
+    Args:
+        tasks: List of task tuples (format depends on spec type)
+               For markdown: (title, status)
+               For json: (story_id, title, status)
+
+    Returns: The first incomplete task tuple, or None if all complete
+    """
+    for task in tasks:
+        # Status is always the last element in the tuple
+        status = task[-1]
+        if status == "incomplete":
+            return task
+
+    return None
+
+
+def generate_iteration_summary(
+    iteration: int,
+    spec_format: str,
+    spec_file: Path,
+    file_changes: dict[str, list[str]],
+    exit_code: int
+) -> str:
+    """
+    Generate a complete iteration summary by gathering task info and formatting it.
+
+    Args:
+        iteration: Iteration number
+        spec_format: "json" or "markdown"
+        spec_file: Path to spec file
+        file_changes: Dict with "added", "modified", "deleted" file lists
+        exit_code: Exit code of the iteration
+
+    Returns: Formatted summary string
+    """
+    # Get all tasks
+    if spec_format == "json":
+        tasks = get_json_stories(spec_file)
+    else:
+        tasks = get_markdown_tasks(spec_file)
+
+    # Calculate progress
+    total_tasks = len(tasks)
+    completed_tasks = sum(1 for task in tasks if task[-1] == "complete")
+
+    # Find current task (the one that was just worked on)
+    # We look for the most recently completed task, or the first incomplete one
+    current_task = None
+    task_status = "incomplete"
+
+    # Try to find the last completed task (assuming it was just completed this iteration)
+    for task in reversed(tasks):
+        if task[-1] == "complete":
+            current_task = task
+            task_status = "complete"
+            break
+
+    # If no complete tasks, find the first incomplete one
+    if current_task is None:
+        current_task = find_current_task(tasks)
+        if current_task:
+            task_status = "incomplete"
+
+    # Extract task title based on format
+    if current_task:
+        if spec_format == "json":
+            # Format: (story_id, title, status)
+            task_title = current_task[1]
+        else:
+            # Format: (title, status)
+            task_title = current_task[0]
+    else:
+        task_title = "Unknown task"
+
+    # Format and return summary
+    return format_iteration_summary(
+        iteration=iteration,
+        spec_format=spec_format,
+        task_title=task_title,
+        task_status=task_status,
+        files_added=file_changes["added"],
+        files_modified=file_changes["modified"],
+        files_deleted=file_changes["deleted"],
+        exit_code=exit_code,
+        total_tasks=total_tasks,
+        completed_tasks=completed_tasks
+    )
+
+
 def parse_arguments() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
@@ -504,9 +910,18 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
         else:
             prompt = generate_markdown_prompt(spec_basename, progress_file, completion_promise)
 
+        # Capture git status before iteration
+        before_files = get_git_status()
+
         # Run Claude iteration
         print("Running Claude...")
         exit_code, output = run_claude_iteration(prompt, progress_file, iteration)
+
+        # Capture git status after iteration
+        after_files = get_git_status()
+
+        # Compute file changes during this iteration
+        file_changes = diff_file_changes(before_files, after_files)
 
         if exit_code == 0:
             print("Iteration completed successfully")
@@ -525,6 +940,29 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
 
         # Commit any changes
         commit_changes(spec_name, iteration)
+
+        # Generate and display iteration summary
+        print()
+        summary = generate_iteration_summary(
+            iteration=iteration,
+            spec_format=spec_format,
+            spec_file=spec_file,
+            file_changes=file_changes,
+            exit_code=exit_code
+        )
+        print(summary)
+        print()
+
+        # Append summary to progress file (without color codes)
+        # Remove ANSI color codes for file storage
+        summary_plain = summary
+        for color_code in [GREEN, YELLOW, RED, BLUE, RESET]:
+            summary_plain = summary_plain.replace(color_code, "")
+
+        with open(progress_file, "a") as f:
+            f.write("\n")
+            f.write(summary_plain)
+            f.write("\n")
 
         # Sleep between iterations
         time.sleep(2)
