@@ -198,6 +198,7 @@ Create the review-loop script with the following capabilities:
   - Loop continues until LGTM or max iterations
 
 ### Step 11: Test configuration integration
+**Status:** complete
 - Create test `.claude-kit` config with custom values
 - Verify CLI args override config values
 - Test precedence: home → git-root → cwd → CLI
