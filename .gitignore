@@ -17,3 +17,6 @@ temp/
 # Claude Code local files
 .agent-prompts/
 .claude/settings.local.json
+
+# Spawn plugin worktrees
+.wt-agents/

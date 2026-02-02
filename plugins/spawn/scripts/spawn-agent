@@ -93,7 +93,7 @@ fi
 
 repo_root=$(git rev-parse --show-toplevel)
 repo_name=$(basename "$repo_root")
-worktree_path="$repo_root/$worktree_name"
+worktree_path="$repo_root/.wt-agents/$worktree_name"
 
 # Check if worktree already exists
 if [[ -d "$worktree_path" ]]; then
