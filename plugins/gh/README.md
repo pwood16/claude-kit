@@ -28,6 +28,32 @@ Fetch, checkout, and load PR context for review.
 - Read PR information via GitHub CLI
 - **Cannot**: push, commit, merge, or modify PRs
 
+### `/gh:wt-clean [description]`
+
+Clean up git worktrees with interactive confirmation.
+
+**Usage:**
+```bash
+/gh:wt-clean                    # List all worktrees for cleanup
+/gh:wt-clean authentication     # Clean worktrees matching "authentication"
+/gh:wt-clean merged PRs         # Clean worktrees with merged PRs
+```
+
+**What it does:**
+1. Lists all git worktrees (excluding main repository)
+2. Filters by description if provided (AI matches against names, branches, commits, PRs)
+3. Checks staleness (merged PRs, old commits, branch status)
+4. Warns about uncommitted changes
+5. Prompts for removal with options (worktree only or worktree + branch)
+6. Safely removes selected worktrees and branches
+
+**Permissions:**
+- List and inspect worktrees
+- Remove worktrees (with confirmation)
+- Delete local branches (with confirmation)
+- Read PR information to determine staleness
+- **Cannot**: delete main worktree, delete remote branches, or force remove without permission
+
 ## Installation
 
 Part of claude-kit marketplace:

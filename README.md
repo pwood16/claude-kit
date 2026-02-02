@@ -18,6 +18,7 @@ See [plugins/spawn](plugins/spawn) for details.
 GitHub branch and PR workflow automation commands.
 
 - `/gh:load-pr [branch-or-pr-number]` - Fetch, checkout, and load PR context for review
+- `/gh:wt-clean [description]` - Clean up git worktrees with interactive confirmation
 - `/gh:pr-draft` - Smart commit, push, and create draft PR with AI-generated description
 
 See [plugins/gh](plugins/gh) for details.
