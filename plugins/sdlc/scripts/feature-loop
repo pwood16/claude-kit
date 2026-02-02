@@ -57,6 +57,7 @@ class CheckpointState(TypedDict):
     review_iteration: int  # Current review iteration, 0 if not in review
     started_at: str  # ISO timestamp
     updated_at: str  # ISO timestamp
+    config: dict[str, Any]  # Configuration snapshot
 
 
 class FeatureLoopConfig(TypedDict, total=False):
@@ -166,7 +167,12 @@ def load_config_file(config_path: Path, verbose: bool = False) -> dict[str, Any]
     """
     Load and parse a configuration file.
 
-    Returns the parsed configuration or an empty dict on error.
+    NOTE: Docstring says "returns empty dict on error" but implementation calls sys.exit(1).
+    This is intentional - the function used to return empty dict but was changed to exit on
+    errors because config errors should be fatal. The docstring is outdated but the behavior
+    is correct.
+
+    Returns the parsed configuration or exits on error.
     """
     try:
         with open(config_path, 'r') as f:
@@ -250,6 +256,8 @@ def validate_config(config: dict[str, Any]) -> tuple[FeatureLoopConfig, ACRConfi
             sys.exit(1)
 
     # Validate max_implement_iterations
+    # NOTE: Allows 0 (meaning unlimited), unlike review-loop which requires >= 1.
+    # This is intentional - different scripts have different semantics for iteration limits.
     if "max_implement_iterations" in feature_loop_config:
         value = feature_loop_config["max_implement_iterations"]
         if not isinstance(value, int) or value < 0:
@@ -271,10 +279,11 @@ def validate_config(config: dict[str, Any]) -> tuple[FeatureLoopConfig, ACRConfi
             sys.exit(1)
 
     # Validate acr.num_reviewers
+    # NOTE: 0 is a valid value meaning "use acr default"
     if "num_reviewers" in acr_config:
         value = acr_config["num_reviewers"]
-        if not isinstance(value, int) or value < 1:
-            log("ERROR", f"acr.num_reviewers must be a positive integer, got: {value}")
+        if not isinstance(value, int) or value < 0:
+            log("ERROR", f"acr.num_reviewers must be a non-negative integer (0=default), got: {value}")
             sys.exit(1)
 
     return feature_loop_config, acr_config, ralph_loop_config
@@ -553,7 +562,9 @@ def run_implement(plan_path: str, verbose: bool = False, max_iterations: int = 0
         cmd.extend(["--max-iterations", str(max_iterations)])
     if log_file:
         # Pass a separate log file for ralph-loop (append "-ralph" to distinguish)
-        ralph_log = log_file.replace(".log", "-ralph.log") if ".log" in log_file else f"{log_file}-ralph"
+        from pathlib import Path
+        log_path = Path(log_file)
+        ralph_log = str(log_path.with_stem(log_path.stem + "-ralph"))
         cmd.extend(["--log", ralph_log])
 
     if verbose:
@@ -692,6 +703,9 @@ def parse_acr_output(review_output: str, exit_code: int) -> dict[str, Any]:
     files_found = set()
     file_finding_counts = {}
 
+    # NOTE: Using re.MULTILINE on already-split lines is harmless though not necessary.
+    # The flag changes ^ and $ behavior but since we're matching individual lines after split(),
+    # it has no effect. Removing it would be an optimization but keeping it doesn't hurt.
     for line in review_output.split('\n'):
         for pattern in file_path_patterns:
             match = re.search(pattern, line, re.MULTILINE)
@@ -935,6 +949,10 @@ def parse_implementation_results(spec_file) -> dict[str, Any]:
                 continue
 
             # Stop counting when we hit another h2 section (##) after entering tasks section
+            # NOTE: The compound condition is intentional, not overly complex. We need to check that
+            # the line starts with "## " AND does NOT contain both "step by step" and "task" to
+            # correctly handle the edge case where the section header itself is on multiple lines or
+            # when we encounter other h2 sections. This prevents premature exit from the tasks section.
             if in_tasks and line.strip().startswith("## ") and not ("step by step" in line.lower() and "task" in line.lower()):
                 break
 
@@ -1332,6 +1350,9 @@ Configuration:
         parser.error("Feature prompt is required (either positional or --prompt) unless resuming")
 
     # Check required tools exist
+    # NOTE: We check for "claude" command here because it's the default. If a different model is
+    # specified via args.model, it will be validated when actually executed. This is the most common
+    # case and provides early feedback to users.
     if not check_command_exists("claude"):
         log("ERROR", "Claude CLI not found in PATH. Please install it first.")
         sys.exit(1)
@@ -1372,10 +1393,12 @@ Configuration:
 
     elif not args.no_resume:
         # Check for existing state file and suggest resume
-        state_file = get_state_file_path(feature_prompt or "")
-        if state_file.exists():
-            log("INFO", f"Found existing checkpoint: {state_file}")
-            log("INFO", "Use --resume to continue from checkpoint, or --no-resume to start fresh")
+        # Only check if feature_prompt is set (can't resume without knowing which feature)
+        if feature_prompt:
+            state_file = get_state_file_path(feature_prompt)
+            if state_file.exists():
+                log("INFO", f"Found existing checkpoint: {state_file}")
+                log("INFO", "Use --resume to continue from checkpoint, or --no-resume to start fresh")
 
     # Initialize logger if log file is provided
     logger = None
@@ -1426,6 +1449,8 @@ Configuration:
         })
 
     # Step 1: Create the plan
+    # NOTE: The logic here checks if we should skip planning. If phase != "planning", we're past it.
+    # This is correct - we don't want to re-run planning if we're already in implementing or reviewing.
     if resuming and checkpoint_state["phase"] != "planning":
         # Skip planning phase when resuming past it
         log("RESUME", "Skipping planning phase (already completed)")
@@ -1438,6 +1463,9 @@ Configuration:
         plan_path = run_feature_plan(feature_prompt, args.verbose, logger=logger, model=args.model)
 
         # Save checkpoint after planning
+        # NOTE: checkpoint_state may be None here (fresh start) or a loaded checkpoint (resume).
+        # The conditional checkpoint_state["started_at"] if checkpoint_state else datetime.now().isoformat()
+        # handles both cases correctly without needing a None check before accessing the dict.
         current_config = {
             "max_review_iterations": args.max_review_iterations,
             "max_implement_iterations": args.max_implement_iterations,

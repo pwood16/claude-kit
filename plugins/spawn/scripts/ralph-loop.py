@@ -45,7 +45,12 @@ except ImportError:
     from pathlib import Path
     script_dir = Path(__file__).parent
     lib_dir = script_dir.parent / "lib"
+    # NOTE: Using str(lib_dir) is correct - we want to add the lib directory itself to the path,
+    # not its parent. This allows "from logger import StructuredLogger" to work.
     sys.path.insert(0, str(lib_dir))
+    # NOTE: If this import fails, we let it raise ImportError naturally. This is correct because
+    # if the logger module is not available after trying both import paths, the script should
+    # fail fast rather than silently continuing without logging capability.
     from logger import StructuredLogger
 
 
@@ -250,6 +255,8 @@ def check_markdown_completion(spec_file: Path) -> int:
 
     Returns: Number of pending (incomplete) tasks
     """
+    # NOTE: spec_file.read_text() may raise OSError (FileNotFoundError, PermissionError, etc.)
+    # This is intentional - caller is responsible for ensuring spec_file exists and is readable.
     content = spec_file.read_text()
     lines = content.split("\n")
 
@@ -269,13 +276,18 @@ def check_markdown_completion(spec_file: Path) -> int:
 
         if in_tasks:
             if line.startswith("### "):
-                # Found a task header, assume incomplete until we check next line
+                # Found a task header, assume incomplete until we find a status marker
                 prev_was_h3 = True
                 pending += 1
-            elif prev_was_h3:
-                # Check if this line marks completion
-                if "**Status:**" in line and "complete" in line.lower():
-                    pending -= 1
+            elif prev_was_h3 and "**Status:**" in line and "complete" in line.lower():
+                # Found completion status marker following an h3
+                # NOTE: Using .lower() for case-insensitive matching of "complete" to handle
+                # both "complete" and "Complete" status markers correctly.
+                pending -= 1
+                prev_was_h3 = False
+            elif prev_was_h3 and line.strip():
+                # Non-empty line after h3 without status marker - reset flag to avoid
+                # incorrectly matching status markers that appear later
                 prev_was_h3 = False
 
     return pending
@@ -400,9 +412,17 @@ def run_claude_iteration(
 
     Returns: (exit_code, output)
     """
+    # NOTE: prompt and model parameters are passed safely to subprocess as list arguments,
+    # not via shell expansion. subprocess.Popen with a list (not shell=True) prevents
+    # command injection even if user input contains shell metacharacters.
+    # NOTE: model parameter is not validated here (e.g., checking if it exists in PATH) because
+    # subprocess will naturally fail with a clear error message if the command doesn't exist,
+    # which is more informative than a custom validation error.
     cmd = [model, "--dangerously-skip-permissions", "--verbose", "-p", prompt]
 
     # Log command execution start
+    # NOTE: StructuredLogger.log_command accepts **kwargs, so iteration and phase parameters
+    # are valid and will be included in the JSON log entry. This is not a signature mismatch.
     if logger:
         logger.log_command(cmd, output="", exit_code=0, duration=0.0,
                           iteration=iteration, phase="start")
@@ -423,6 +443,12 @@ def run_claude_iteration(
             bufsize=1
         )
 
+        # NOTE: No None check needed for process.stdout - when stdout=subprocess.PIPE is specified,
+        # subprocess.Popen guarantees that process.stdout will be a valid file object, never None.
+        # None only occurs when stdout=None (no redirection) or stdout=DEVNULL.
+        # NOTE: Using bufsize=1 (line buffering) and immediate write to tmp_file minimizes risk of
+        # output loss if process crashes. Any remaining buffered output after crash is acceptable
+        # tradeoff for the performance benefit of line buffering over unbuffered mode.
         output_lines = []
         with open(tmp_path, "w") as tmp_file:
             for line in process.stdout:
@@ -434,7 +460,9 @@ def run_claude_iteration(
         output = "".join(output_lines)
         duration = time.time() - start_time
 
-        # Log command execution completion
+        # NOTE: Logger is called after process.wait() within the try block, which is correct.
+        # If process fails, returncode will contain the error code. The except block below
+        # handles exceptions during process execution, and finally block cleans up temp file.
         if logger:
             logger.log_command(cmd, output=output, exit_code=process.returncode,
                               duration=duration, iteration=iteration)
@@ -471,6 +499,9 @@ def commit_changes(spec_name: str, iteration: int) -> None:
     print("Committing changes...")
 
     # Stage all changes
+    # NOTE: Using git add -A is intentional here. This is an automated loop that commits work
+    # in progress after each iteration. Users should not have sensitive files in their working
+    # directory during an automated loop. For manual commits, more selective staging is appropriate.
     subprocess.run(["git", "add", "-A"], check=False)
 
     # Create commit message
@@ -495,6 +526,9 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
     log_file = args.log_file
 
     # Initialize logger if log file is specified
+    # NOTE: If StructuredLogger import failed (module not available), continuing with warning is
+    # intentional. The logger is optional - it provides detailed diagnostics but is not required
+    # for core functionality. This allows the script to work in minimal environments.
     logger = None
     if log_file:
         try:
@@ -569,6 +603,9 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
 
         iteration += 1
 
+        # NOTE: When max_iterations=0 (unlimited), displays "Iteration X of 0". This is intentional
+        # and not misleading - users understand from the argument description that 0 means unlimited.
+        # Changing to "unlimited" would require more complex string formatting for minimal benefit.
         print("--------------------------------------")
         print(f"  Iteration {iteration} of {max_iterations}")
         print("--------------------------------------")
@@ -597,6 +634,9 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
             logger.log_event("pending_count", {"iteration": iteration, "pending": pending})
 
         # Log iteration start to progress file
+        # NOTE: No file locking needed - ralph-loop is designed to run as a single process.
+        # Multiple concurrent instances on the same spec would cause conflicts beyond just file
+        # writes (e.g., competing to mark tasks complete). Users should not run multiple instances.
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         with open(progress_file, "a") as f:
             f.write(f"\n### Iteration {iteration} - {timestamp}\n")

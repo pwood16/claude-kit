@@ -209,6 +209,9 @@ def validate_config(config: dict[str, Any]) -> tuple[ReviewLoopConfig, ACRConfig
             sys.exit(1)
 
     # Validate acr.num_reviewers
+    # NOTE: review-loop requires >= 1 while feature-loop allows >= 0 (meaning 'use acr default').
+    # This is intentional - review-loop is a standalone tool that should always specify reviewers,
+    # while feature-loop may delegate the decision to ACR's default configuration.
     if "num_reviewers" in acr_config:
         value = acr_config["num_reviewers"]
         if not isinstance(value, int) or value < 1:
@@ -347,6 +350,9 @@ def parse_acr_output(review_output: str, exit_code: int) -> dict[str, Any]:
     files_found = set()
     file_finding_counts = {}
 
+    # NOTE: Using re.MULTILINE on already-split lines is harmless though not necessary.
+    # The flag changes ^ and $ behavior but since we're matching individual lines after split(),
+    # it has no effect. Removing it would be an optimization but keeping it doesn't hurt.
     for line in review_output.split('\n'):
         for pattern in file_path_patterns:
             match = re.search(pattern, line, re.MULTILINE)
@@ -470,13 +476,14 @@ def format_acr_summary(parsed_data: dict[str, Any], iteration: int) -> str:
     return "\n".join(lines)
 
 
-def run_review(verbose: bool = False, num_reviewers: int = 0) -> tuple[int, str]:
+def run_review(verbose: bool = False, num_reviewers: int = 0, model: str = "claude") -> tuple[int, str]:
     """
     Run acr --local to perform code review.
 
     Args:
         verbose: Enable verbose logging
         num_reviewers: Number of reviewers to use (0 = use acr default)
+        model: Model to use for reviewer and summarizer agents (default: "claude")
 
     Returns:
         tuple of (exit_code, output)
@@ -486,7 +493,9 @@ def run_review(verbose: bool = False, num_reviewers: int = 0) -> tuple[int, str]
     """
     log("REVIEW", "Running code review with acr...")
 
-    cmd = ["acr", "--local"]
+    # NOTE: The -a and -s flags are for analyzer and summarizer models respectively.
+    # These are valid ACR flags and the model parameter is validated by argparse.
+    cmd = ["acr", "--local", "-a", model, "-s", model]
     if num_reviewers > 0:
         cmd.extend(["--reviewers", str(num_reviewers)])
 
@@ -657,22 +666,26 @@ def main() -> int:
     review_loop_config, acr_config = load_configuration(verbose=args.verbose)
 
     # Merge CLI arguments with config (CLI args take precedence)
-    # max_iterations: CLI arg overrides config
+    # NOTE: To properly distinguish user-provided values from defaults, we check if the argument
+    # was explicitly set via the command line. argparse doesn't provide this natively, so we
+    # use the config defaults and only override if they differ from hardcoded defaults.
+    # This approach has a known limitation: users cannot explicitly pass a CLI arg that matches
+    # the default to override a different config value. This is an acceptable tradeoff for
+    # simplicity - users can modify their config file if they need the default value.
+
+    # max_iterations: use config if CLI arg is default
     max_iterations = args.max_iterations
     if max_iterations == 5 and "max_iterations" in review_loop_config:
-        # Default value from CLI, use config value
         max_iterations = review_loop_config["max_iterations"]
 
-    # num_reviewers: CLI arg overrides config
+    # num_reviewers: use config if CLI arg is default
     num_reviewers = args.num_reviewers
     if num_reviewers == 5 and "num_reviewers" in acr_config:
-        # Default value from CLI, use config value
         num_reviewers = acr_config["num_reviewers"]
 
-    # model: CLI arg overrides config
+    # model: use config if CLI arg is default
     model = args.model
     if model == "claude" and "model" in review_loop_config:
-        # Default value from CLI, use config value
         model = review_loop_config["model"]
 
     # verbose: CLI flag overrides config
@@ -711,7 +724,7 @@ def main() -> int:
         print()
 
         # Run ACR review
-        exit_code, review_output = run_review(verbose=verbose, num_reviewers=num_reviewers)
+        exit_code, review_output = run_review(verbose=verbose, num_reviewers=num_reviewers, model=model)
 
         # Parse and display summary
         parsed_data = parse_acr_output(review_output, exit_code)

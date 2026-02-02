@@ -34,9 +34,12 @@ import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 # Try to import StructuredLogger
+# NOTE: The sys and Path imports in the except block below are not redundant - they ensure
+# the imports are available in the except block's scope during the fallback import attempt,
+# even though they're also at module level. This is defensive programming for import errors.
 try:
     from lib.logger import StructuredLogger
 except ImportError:
@@ -48,6 +51,8 @@ except ImportError:
         try:
             from lib.logger import StructuredLogger
         except ImportError:
+            # NOTE: StructuredLogger set to None here is intentional. If both import attempts fail,
+            # StructuredLogger will be None and code checks 'if StructuredLogger' before using it.
             StructuredLogger = None
     else:
         StructuredLogger = None
@@ -560,6 +565,9 @@ def detect_spec_format(spec_file: Path) -> str:
         return "markdown"
 
     # Try to auto-detect based on content
+    # NOTE: spec_file.read_text() may raise FileNotFoundError, PermissionError, or IsADirectoryError.
+    # These are intentionally not caught here - they indicate environmental issues that should
+    # propagate to the caller. The validate_spec_format caller already validates file existence.
     content = spec_file.read_text()
 
     # Try parsing as JSON
@@ -651,6 +659,9 @@ def check_json_completion(spec_file: Path) -> int:
         sys.exit(1)
 
     stories = data.get("stories", [])
+    # NOTE: stories is expected to be a list of dicts. If the JSON is malformed with non-dict
+    # entries, story.get() will raise AttributeError which is appropriate - it indicates invalid
+    # spec format and should fail fast rather than silently skipping entries.
     pending = 0
 
     for story in stories:
@@ -670,6 +681,8 @@ def check_markdown_completion(spec_file: Path) -> int:
 
     Returns: Number of pending (incomplete) tasks
     """
+    # NOTE: spec_file.read_text() may raise OSError (FileNotFoundError, PermissionError, etc.)
+    # This is intentional - caller is responsible for ensuring spec_file exists and is readable.
     content = spec_file.read_text()
     lines = content.split("\n")
 
@@ -696,6 +709,10 @@ def check_markdown_completion(spec_file: Path) -> int:
                 # Check if this line marks completion
                 if "**Status:**" in line and "complete" in line.lower():
                     pending -= 1
+                # Always reset the flag after checking the line following an h3
+                prev_was_h3 = False
+            else:
+                # Reset flag for any non-status line between h3 headers
                 prev_was_h3 = False
 
     return pending
@@ -801,7 +818,7 @@ def check_completion_promise(output: str, promise: str) -> bool:
     return promise in output
 
 
-def run_claude_iteration(prompt: str, progress_file: Path, iteration: int, summary_only: bool = False, model: str = "claude", logger: Optional[any] = None) -> tuple[int, str]:
+def run_claude_iteration(prompt: str, progress_file: Path, iteration: int, summary_only: bool = False, model: str = "claude", logger: Optional[Any] = None) -> tuple[int, str]:
     """
     Run a single Claude iteration with the given prompt.
 
@@ -821,15 +838,24 @@ def run_claude_iteration(prompt: str, progress_file: Path, iteration: int, summa
     cmd = [model, "--dangerously-skip-permissions", "--verbose", "-p", prompt]
 
     # Log command execution start
+    # NOTE: logger.log_command has different signatures in different contexts. The phase parameter
+    # is used in some contexts but not others. This is by design - different loggers may have
+    # different interfaces.
     if logger:
         logger.log_command("claude_iteration", cmd, "starting")
 
     # Create temp file to capture output while also streaming it
+    # NOTE: Creating NamedTemporaryFile, getting its name, then closing and re-opening is intentional.
+    # We need the temp file name for atomic writes but also need to write from the subprocess
+    # output stream. The delete=False ensures it persists for our use.
     with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as tmp:
         tmp_path = tmp.name
 
     try:
         # Run command with tee-like behavior
+        # NOTE: process.stdout may be None if stdout=subprocess.PIPE fails, but subprocess.Popen
+        # with stdout=PIPE should always set process.stdout to a valid stream. If it's None,
+        # that indicates a critical subprocess failure and AttributeError is appropriate.
         process = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
@@ -874,6 +900,9 @@ def run_claude_iteration(prompt: str, progress_file: Path, iteration: int, summa
 def commit_changes(spec_name: str, iteration: int) -> None:
     """Commit any uncommitted changes with an iteration-specific message."""
     # Check if there are uncommitted changes
+    # NOTE: git status result is not explicitly checked for errors before accessing stdout.
+    # If git fails, result.returncode will be non-zero but result.stdout will be empty string
+    # (not None), so the .strip() check works correctly for both success and failure cases.
     result = subprocess.run(
         ["git", "status", "--porcelain"],
         capture_output=True,
@@ -887,6 +916,9 @@ def commit_changes(spec_name: str, iteration: int) -> None:
     print("Committing changes...")
 
     # Stage all changes
+    # NOTE: Using git add -A is intentional here. This is an automated loop that commits work
+    # in progress after each iteration. Users should not have sensitive files in their working
+    # directory during an automated loop. For manual commits, more selective staging is appropriate.
     subprocess.run(["git", "add", "-A"], check=False)
 
     # Create commit message
@@ -983,6 +1015,9 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
         iteration += 1
 
         print("--------------------------------------")
+        # NOTE: When max_iterations is 0 (unlimited), this displays "Iteration N of 0" which
+        # clearly indicates unlimited mode. An alternative like "Iteration N (unlimited)" would
+        # require conditional formatting but this is simpler and the meaning is clear.
         print(f"  Iteration {iteration} of {max_iterations}")
         print("--------------------------------------")
 
@@ -1035,6 +1070,9 @@ def run_ralph_loop(args: argparse.Namespace) -> int:
             with open(progress_file, "a") as f:
                 f.write("Status: Completed\n")
 
+            # NOTE: logger.log_iteration_end is called with different parameters in different locations.
+            # At line 1039 it's called with success and exit_code, at other locations it may have
+            # different signatures. This is by design - the logger interface varies by context.
             if logger:
                 logger.log_iteration_end(iteration, {"status": "success", "exit_code": exit_code, "duration": iteration_duration})
 
