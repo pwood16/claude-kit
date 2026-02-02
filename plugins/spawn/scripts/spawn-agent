@@ -95,6 +95,9 @@ repo_root=$(git rev-parse --show-toplevel)
 repo_name=$(basename "$repo_root")
 worktree_path="$repo_root/.wt-agents/$worktree_name"
 
+# Ensure .wt-agents directory exists
+mkdir -p "$repo_root/.wt-agents"
+
 # Check if worktree already exists
 if [[ -d "$worktree_path" ]]; then
   echo "Worktree already exists at: $worktree_path"
