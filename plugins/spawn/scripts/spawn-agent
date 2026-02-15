@@ -166,6 +166,7 @@ fi
 if [[ "$mode" == "print" ]]; then
   # Print mode: use -p flag, terminal closes after completion
   shell_cmd="
+    unset CLAUDECODE && \
     cd '$worktree_path' && \
     echo 'Starting Claude agent for: $worktree_name (print mode)' && \
     echo 'Repository: $repo_name' && \
@@ -188,10 +189,11 @@ elif [[ "$mode" == "ralph" ]]; then
   ralph_loop_script="$script_dir/ralph-loop"
 
   # Build shell command that runs the ralph-loop script
-  shell_cmd="cd '$worktree_path' && '$ralph_loop_script' --prd '$prd_basename' --max-iterations $max_iterations --completion-promise '$completion_promise'"
+  shell_cmd="unset CLAUDECODE && cd '$worktree_path' && '$ralph_loop_script' --prd '$prd_basename' --max-iterations $max_iterations --completion-promise '$completion_promise'"
 else
   # Interactive mode: exec directly into claude (replaces shell process)
   shell_cmd="
+    unset CLAUDECODE && \
     cd '$worktree_path' && \
     echo 'Starting Claude agent for: $worktree_name (interactive mode)' && \
     echo 'Repository: $repo_name' && \
