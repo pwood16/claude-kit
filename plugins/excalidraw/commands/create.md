@@ -84,7 +84,7 @@ Create a valid Excalidraw JSON file with these requirements:
   "opacity": 100,
   "groupIds": [],
   "frameId": null,
-  "index": "a0",
+  "index": "a1",
   "roundness": { "type": 3 },
   "seed": 1234567890,
   "version": 1,
@@ -143,6 +143,17 @@ Create a valid Excalidraw JSON file with these requirements:
 - Generate unique IDs using format: `element-1`, `element-2`, etc.
 - Use random 10-digit numbers for `seed` and `versionNonce`
 - Use current timestamp (milliseconds) for `updated`
+
+**Fractional index generation (CRITICAL — incorrect indices will prevent loading):**
+- Excalidraw uses the `fractional-indexing` library for element z-order
+- The head character determines the required integer-part length:
+  - `a` prefix → 2 chars total: `a0, a1, ..., a9, aA, ..., aZ, aa, ..., az` (62 values)
+  - `b` prefix → 3 chars total: `b00, b01, ..., b0z, b10, ..., bzz` (3844 values)
+- Character order: `0-9`, then `A-Z`, then `a-z`
+- For most diagrams, `a0` through `az` is enough (62 elements). If you need more, continue with `b00`, `b01`, etc.
+- NEVER zero-pad indices (`a001` is INVALID)
+- NEVER use 2-char keys with a `b` prefix (`b1` is INVALID — must be `b01`)
+- Every element MUST have a unique index — no duplicates
 
 ### 5. Save the Excalidraw File
 
