@@ -6,6 +6,8 @@ Spawn new Claude agents in git worktrees for parallel development.
 
 The `spawn` plugin provides a `/spawn:wt-agent` command that creates isolated git worktrees and launches new Claude instances to work on tasks in parallel. Each spawned agent runs in a distinctive Alacritty terminal window with color-coded backgrounds to identify the mode (dark blue for interactive/print, purple for ralph).
 
+Worktrees are created in the `.wt-agents/` directory at the repository root. This directory is gitignored by default, preventing accidental commits of worktree files.
+
 ## Prerequisites
 
 - Git repository (must be run from within a repo)
@@ -140,7 +142,7 @@ Agent: [Uses Skill tool with --mode print for each agent]
 
 When you run `/spawn:wt-agent <worktree-name> [prompt] [--mode interactive|print|ralph] [--prd FILE] [options]`:
 
-1. Creates git worktree at `<repo-root>/<worktree-name>`
+1. Creates git worktree at `<repo-root>/.wt-agents/<worktree-name>`
 2. Generates prompt file at `.agent-prompts/<worktree-name>.md`
 3. Spawns new Alacritty window with:
    - Title: `Claude: <repo-name>/<worktree-name>` (or `Claude [Ralph]: ...` for ralph mode)

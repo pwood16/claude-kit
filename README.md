@@ -11,6 +11,7 @@ Spawn Claude agents in git worktrees for parallel development work.
 - Supports interactive mode (`--interactive`) for REPL-style development
 - Supports print mode (`--print`) to output paths without spawning terminal
 - Each agent works in isolation with full git history
+- Worktrees are created in `.wt-agents/` directory (can be gitignored)
 
 See [plugins/spawn](plugins/spawn) for details.
 
