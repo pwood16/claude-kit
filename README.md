@@ -8,6 +8,7 @@ A marketplace of productivity plugins for Claude Code.
 Spawn Claude agents in git worktrees for parallel development work.
 
 - `/spawn:wt-agent <name> [prompt]` - Create a worktree and spawn a new agent with optional prompt
+- `/spawn:plan-to-prd [plan-file] [--out output.json]` - Convert a plan into a ralph-loop PRD JSON file
 - Supports interactive mode (`--interactive`) for REPL-style development
 - Supports print mode (`--print`) to output paths without spawning terminal
 - Each agent works in isolation with full git history

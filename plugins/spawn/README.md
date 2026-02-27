@@ -117,6 +117,39 @@ Ralph mode spawns an autonomous agent that works through a structured PRD/spec f
 /spawn:wt-agent greenfield-app --mode ralph --prd prd.json
 ```
 
+### Plan to PRD (converting plans to executable specs)
+```
+/spawn:plan-to-prd specs/my-plan.md
+```
+
+Converts an implementation plan (markdown file, SDLC spec, or conversation context) into a structured PRD JSON file that ralph mode can execute. The output is written to `specs/<name>-prd.json` by default.
+
+**With a file path:**
+```
+/spawn:plan-to-prd docs/auth-redesign.md
+```
+
+**With custom output path:**
+```
+/spawn:plan-to-prd docs/auth-redesign.md --out auth-prd.json
+```
+
+**From conversation context (no arguments):**
+```
+/spawn:plan-to-prd
+```
+After a planning session, run this with no arguments and it will extract the plan from your conversation.
+
+**How it connects to ralph mode:**
+
+The PRD JSON output is the exact format ralph mode expects. A typical workflow:
+
+1. Plan: Use `/sdlc:plan`, plan mode, or conversation to design a feature
+2. Convert: `/spawn:plan-to-prd <plan-file>` to generate the PRD JSON
+3. Execute: `/spawn:wt-agent <name> --mode ralph --prd specs/<name>-prd.json`
+
+You can also use the PRD with a team (TeamCreate) for coordinated multi-agent execution. Since everything is captured in the PRD file, you can clear context between steps.
+
 ### Using a file as the prompt
 
 Ask Claude to read the file and spawn the agent:
