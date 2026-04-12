@@ -25,6 +25,11 @@
       "name": "sdlc",
       "source": "./plugins/sdlc",
       "description": "Software development lifecycle automation commands"
+    },
+    {
+      "name": "browser",
+      "source": "./plugins/browser",
+      "description": "Browser automation for AI agents using agent-browser"
     }
   ]
 }
