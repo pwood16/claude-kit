@@ -1,0 +1,7 @@
+{
+  "name": "browser",
+  "description": "Browser automation for AI agents using agent-browser — QA verification and content extraction from web pages",
+  "author": {
+    "name": "Phil Wood"
+  }
+}
