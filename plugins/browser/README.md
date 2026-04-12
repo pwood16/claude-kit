@@ -12,6 +12,15 @@ QA verify a web page or app. Check that it looks and works correctly after modif
 - Reports visual issues, broken elements, missing content
 - Also available as an auto-triggered skill when you modify frontend code
 
+### `/browser:observe <url>`
+Observe runtime behavior to debug issues like redirect loops, blank pages, or unexpected navigations.
+
+- Captures network requests with status codes during page load
+- Detects redirect chains and loops
+- Reports console errors and page errors
+- Guides hypothesis formation based on what was actually observed
+- Also available as an auto-triggered skill when debugging runtime behavior
+
 ### `/browser:read <url>`
 Extract and summarize content from web pages — especially useful for pages that are hard to scrape (Twitter/X, SPAs, auth-gated content).
 
