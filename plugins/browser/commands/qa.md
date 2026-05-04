@@ -20,11 +20,15 @@ The `$ARGUMENTS` variable may contain a URL: `[url]`
 
 **If URL provided:** Use it directly.
 
-**If no URL provided:** Auto-detect from project context:
-- Check for running dev servers (look for `package.json` scripts like `dev`, `start`)
-- Common defaults: `http://localhost:3000`, `http://localhost:5173`, `http://localhost:8080`
-- Check for recent terminal output mentioning a local URL
-- If unable to detect, ask the user
+**If no URL provided:** Discover the URL from project context (in this order):
+1. Read `package.json` `scripts.dev` / `scripts.start` — extract `--port` or `-p` flags
+2. Read framework config if present: `next.config.*`, `vite.config.*`, `astro.config.*`, `nuxt.config.*`, `remix.config.*`
+3. Read `.env`, `.env.local` for `PORT=`
+4. Check recent terminal output for a printed local URL
+5. Fall back to common defaults in order — try each: `http://localhost:3000`, `http://localhost:5173`, `http://localhost:8080`, `http://localhost:4321`
+6. If none responds, ask the user
+
+Don't guess silently. If you fall back to a default, say so in the report so the user knows which URL was QAed.
 
 ### 2. Check agent-browser is Available
 
