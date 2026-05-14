@@ -64,4 +64,4 @@ Extract the bug details from the prompt
 
 ## Report
 - Summarize the work you've just done in a concise bullet point list.
-- Include the full path to the plan file you created (e.g., `specs/issue-fix-login-error.md`)
+- Include the full path to the plan file you created (e.g., `specs/bug-fix-login-error.md`)
