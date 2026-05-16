@@ -30,6 +30,16 @@
       "name": "browser",
       "source": "./plugins/browser",
       "description": "Browser automation for AI agents using agent-browser"
+    },
+    {
+      "name": "hub",
+      "source": "./plugins/hub",
+      "description": "Personal operational hub — compile a per-domain wiki from ~/dev/hub/ sources"
+    },
+    {
+      "name": "review",
+      "source": "./plugins/review",
+      "description": "Rubric agent-context markdown files and run HTML-based document reviews"
     }
   ]
 }

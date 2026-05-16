@@ -1,0 +1,56 @@
+{
+  "doc": "example-tickets-to-create",
+  "reviewed_at": "2026-05-13T17:24:32.779Z",
+  "reviewer": "reviewer-1",
+  "progress": "5 / 7",
+  "tickets": {
+    "A": {
+      "status": "needs-discussion",
+      "comment": "Schema feels overloaded — wonder if we've added too much with the resolved and dismissed fields. Might be enough to start with a single 'state' enum plus updated_by, and add more later. Shape is right though.",
+      "updated_at": "2026-05-13T17:14:47.998Z"
+    },
+    "B": {
+      "status": "looks-good",
+      "comment": null,
+      "updated_at": "2026-05-13T17:15:12.467Z"
+    },
+    "C": {
+      "status": "needs-changes",
+      "comment": "I was thinking we'd leave the existing read path alone and have the frontend make two calls, then join in the UI table. Keeps things visually together but doesn't entangle the data layer. We'd want to gate the joined view behind admin-level visibility so permissions don't bite us up front.",
+      "updated_at": "2026-05-13T17:17:32.462Z"
+    },
+    "D": {
+      "status": "looks-good",
+      "comment": "This is fine — we can adjust as we go but it's a good start.",
+      "updated_at": "2026-05-13T17:18:08.266Z"
+    },
+    "E": {
+      "status": null,
+      "comment": "Just needs to align with the data shape we'll actually have.",
+      "updated_at": "2026-05-13T17:18:23.910Z"
+    },
+    "F": {
+      "status": "needs-discussion",
+      "comment": "Yeah, this seems right. Might be a 'status' toggle?",
+      "updated_at": "2026-05-13T17:18:59.727Z"
+    },
+    "G": {
+      "status": null,
+      "comment": "As long as the path to this is visible, that's enough. The ticket itself can evolve as we develop.",
+      "updated_at": "2026-05-13T17:19:35.068Z"
+    }
+  },
+  "questions": {
+    "q1": "Remove this question.",
+    "q2": "Yes — we need confirmation. Higher-fidelity mock would help.",
+    "q3": "remove",
+    "q4": "Yes, we need that.",
+    "q5": "We confirmed direction in chat and created a follow-up ticket to remove the acknowledge-only behavior.",
+    "q6": "Yeah, they need their own event.",
+    "q7": "Don't worry about ownership."
+  },
+  "sections": {
+    "updates": "We'll need at least one ticket here, but it can come after we confirm direction with stakeholders. Rough scope: a table + CRUD, UI gated behind a feature flag plus admin role, and integration with the new platform endpoints."
+  },
+  "general": "This is coming together. Let's tighten it up after this round of edits and keep questions scoped to what we'll actually iterate on."
+}
