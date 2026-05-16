@@ -33,6 +33,28 @@ Create diagrams from text descriptions and export to SVG.
 
 See [plugins/excalidraw](plugins/excalidraw) for details.
 
+### [Hub](plugins/hub)
+Personal operational-control hub at `~/dev/hub/` — a single place for notes, plans, and an AI-compiled per-domain wiki.
+
+- `/hub:init` - Idempotent scaffolder for `~/dev/hub/` and dispatch sibling dirs
+- `/hub:brain [domain]` - Compile per-domain wiki at `~/dev/hub/brain/<domain>.md` from hub sources
+- `/hub:brain-health` - Diff the wiki against live sources (file mtimes, `gh`, optional MCP) and flag stale or missing content
+- `/hub:dispatch [path-or-ticket]` - Hand off work to a background Claude in a tmux session; worktree mode default at `~/dev/dispatched/<slug>/<repo>/`
+- Dynamic base-branch detection — no hardcoded per-repo branch map
+
+See [plugins/hub](plugins/hub) for details.
+
+### [Review](plugins/review)
+Review-oriented skills — both for human documents and the markdown files that configure agents.
+
+- `/review:review-agent-md [path]` - Rubric a `CLAUDE.md` / `AGENTS.md` / `.cursorrules` / Copilot-instructions file against 9 best-practice rules
+- `/review:audit-agent-skill [path]` - Rubric `SKILL.md` files against a 10-section best-practices rubric (A–J)
+- `/review:review-doc <path>` - Generate an HTML review page from a markdown draft, then apply reviewer-exported JSON feedback back to the source
+- `/review:iterate-diagram <html-file>` - Visually iterate on any HTML file (diagrams, dashboards, review pages) via Playwright screenshots
+- Pairs naturally with `/hub` for compiling and reviewing personal docs
+
+See [plugins/review](plugins/review) for details.
+
 ## Installation
 
 ### Add the Marketplace

@@ -1,7 +1,7 @@
 {
   "name": "hub",
   "description": "Personal operational hub — compile a per-domain wiki from your own notes, repos, and synced sources at ~/dev/hub/",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "author": {
     "name": "Phil Wood"
   }
