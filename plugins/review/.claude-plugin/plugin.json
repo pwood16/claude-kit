@@ -1,0 +1,8 @@
+{
+  "name": "review",
+  "description": "Review-oriented Claude skills — rubric agent-context markdown files, generate HTML review pages from drafts, and apply reviewer feedback back to source",
+  "version": "0.1.0",
+  "author": {
+    "name": "Phil Wood"
+  }
+}
