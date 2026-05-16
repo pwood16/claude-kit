@@ -30,6 +30,11 @@
       "name": "browser",
       "source": "./plugins/browser",
       "description": "Browser automation for AI agents using agent-browser"
+    },
+    {
+      "name": "hub",
+      "source": "./plugins/hub",
+      "description": "Personal operational hub — compile a per-domain wiki from ~/dev/hub/ sources"
     }
   ]
 }
