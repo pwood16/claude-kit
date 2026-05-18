@@ -47,7 +47,7 @@ See [plugins/hub](plugins/hub) for details.
 ### [Review](plugins/review)
 Review-oriented skills — both for human documents and the markdown files that configure agents.
 
-- `/review:review-agent-md [path]` - Rubric a `CLAUDE.md` / `AGENTS.md` / `.cursorrules` / Copilot-instructions file against 9 best-practice rules
+- `/review:review-agent-md [path]` - Rubric a `CLAUDE.md` / `AGENTS.md` / `.cursorrules` / Copilot-instructions file against 12 best-practice rules
 - `/review:audit-agent-skill [path]` - Rubric `SKILL.md` files against a 10-section best-practices rubric (A–J)
 - `/review:review-doc <path>` - Generate an HTML review page from a markdown draft, then apply reviewer-exported JSON feedback back to the source
 - `/review:iterate-diagram <html-file>` - Visually iterate on any HTML file (diagrams, dashboards, review pages) via Playwright screenshots

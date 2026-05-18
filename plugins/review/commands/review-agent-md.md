@@ -1,5 +1,5 @@
 ---
-description: Rubric a CLAUDE.md / AGENTS.md / GEMINI.md / .cursorrules / copilot-instructions file against 9 best-practice rules. Optional path argument; no path triggers discovery.
+description: Rubric a CLAUDE.md / AGENTS.md / GEMINI.md / .cursorrules / copilot-instructions file against 12 best-practice rules (Anthropic-canonical + Augment-derived). Optional path argument; no path triggers discovery.
 argument-hint: "[path-to-file] (optional)"
 ---
 
