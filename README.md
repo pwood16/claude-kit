@@ -40,6 +40,7 @@ Personal operational-control hub at `~/dev/hub/` — a single place for notes, p
 - `/hub:brain [domain]` - Compile per-domain wiki at `~/dev/hub/brain/<domain>.md` from hub sources
 - `/hub:brain-health` - Diff the wiki against live sources (file mtimes, `gh`, optional MCP) and flag stale or missing content
 - `/hub:dispatch [path-or-ticket]` - Hand off work to a background Claude in a tmux session; worktree mode default at `~/dev/dispatched/<slug>/<repo>/`
+- `/hub:curate [<url> | add <url> [tier] | remove <name-or-url>]` - Triage configured sources and ad-hoc URLs into `brain/inbox.md`; flag contradictions with active work as `tasks/alert-*.md`
 - Dynamic base-branch detection — no hardcoded per-repo branch map
 
 See [plugins/hub](plugins/hub) for details.
