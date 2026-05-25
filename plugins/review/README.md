@@ -4,7 +4,7 @@ Skills for reviewing things — agent-context markdown, documents you want feedb
 
 | Skill | Purpose |
 |-------|---------|
-| `review-agent-md` | Score `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` / `.cursorrules` / Copilot-instructions against a 9-rule rubric (length, paired Don't/Do, vague rules, code examples, etc.). Full-file or diff-only mode. Report-only — no auto-edits. |
+| `review-agent-md` | Score `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` / `.cursorrules` / Copilot-instructions against a 12-rule rubric (length w/ `@import` math, scope-broadness, Anthropic-excluded content, paired Don't/Do, temporal staleness, etc.). Full-file or diff-only mode. Report-only — no auto-edits. |
 | `review-doc` | Turn a markdown draft (RFC, plan, ticket) into a single-file HTML review page with per-section status pills and comments. After the reviewer exports a JSON of their feedback, read it back and apply the comments to the source. |
 | `iterate-diagram` | Visually iterate on any HTML file (diagram, dashboard, the review pages `review-doc` produces) via Playwright screenshots — screenshot, show, critique, edit, repeat. |
 | `audit-agent-skill` | Rubric one or more `SKILL.md` files against a 10-section best-practices checklist (A–J: description, progressive disclosure, gotchas, anti-rationalization, portability, when-not-to-use, delegation antipattern, evals, tax test). Report-only. |

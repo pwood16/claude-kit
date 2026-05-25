@@ -5,7 +5,7 @@ description: Use when auditing one or more SKILL.md files for adherence to best 
 
 # audit-agent-skill
 
-Score one or more `SKILL.md` files against the agent-skill best-practices rubric (10 sections, A–J). Output is a per-skill verdict (ship-quality / needs work / rewrite) with quoted offending lines and concrete next edits. Report-only — no auto-edits.
+Score one or more `SKILL.md` files against the agent-skill best-practices rubric (10 sections, A–J). Canonical sources: Anthropic's [skills spec](https://code.claude.com/docs/en/skills) (progressive disclosure, loader tiers) and [agentskills.io best-practices](https://agentskills.io/skill-creation/best-practices) (calibration, defaults over menus, real-expertise grounding). Output is a per-skill verdict (ship-quality / needs work / rewrite) with quoted offending lines and concrete next edits. Report-only — no auto-edits.
 
 ## When to use
 
@@ -50,8 +50,9 @@ The description is loaded into context every session and routes which skill fire
 
 Skills load in three tiers: metadata (always), body (on trigger), references/scripts (on demand). Monolithic SKILL.md files waste context.
 
-- [ ] SKILL.md body ≤ ~500 lines (Anthropic recommendation); ideally 100–150
+- [ ] SKILL.md body ≤ ~500 lines AND ≤ ~5,000 tokens (Anthropic spec / agentskills.io); ideally 100–150 lines
 - [ ] Heavy or conditional content lives in `references/*.md`, loaded only when needed
+- [ ] Each reference is loaded *conditionally* — the body says *when* to load it (e.g., "Read `references/api-errors.md` if the API returns non-200"), not a generic "see references/ for details"
 - [ ] Deterministic logic the model would otherwise reconstruct lives in `scripts/`
 - [ ] Reference files do NOT have YAML frontmatter (frontmatter promotes them to skill-level visibility; the agent may invoke them out of context)
 
@@ -72,6 +73,8 @@ Skills are workflows with exit criteria, not essays.
 - [ ] Each step has clear exit criteria (what "done" looks like)
 - [ ] No long architectural overviews or rationale dumps in the body — those cause "context rot" by inviting the model to explore unrelated docs
 - [ ] Has a sample output / report template if the skill produces structured output
+- [ ] **Defaults over menus** (agentskills.io) — when multiple tools/approaches could work, the skill picks one default and mentions alternatives briefly. Long "you can use X or Y or Z" lists without a recommendation are a flag.
+- [ ] **No explanations of well-known concepts** (agentskills.io) — the body doesn't define what a PDF/HTTP/database/etc. is. Skill content focuses on what the model *wouldn't* know without it.
 
 #### E. Anti-rationalization
 
