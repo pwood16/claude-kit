@@ -50,8 +50,8 @@ Poll `$claude_project_dir` for the newest `*.jsonl` whose mtime is ≥ `launched
 discover_uuid() {
   local dir="$1" since="$2" deadline=$(($(date +%s) + 30))
   local since_epoch
-  since_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%SZ" "$since" +%s 2>/dev/null \
-    || date -d "$since" +%s)
+  since_epoch=$(TZ=UTC date -j -f "%Y-%m-%dT%H:%M:%SZ" "$since" +%s 2>/dev/null \
+    || TZ=UTC date -d "$since" +%s)
   while (( $(date +%s) < deadline )); do
     local newest mtime
     newest=$(ls -t "$dir"/*.jsonl 2>/dev/null | head -1)
