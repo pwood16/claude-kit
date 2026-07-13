@@ -155,6 +155,10 @@ Read the skeleton at `templates/prompt-skeleton.md` (relative to this skill's di
 - `## Don't` — each line: prohibition + concrete alternative. E.g., `No force push — use \`--force-with-lease\``.
 - `## Report` — 1-2 sentences on what to communicate back.
 
+**Required for code-changing dispatches:**
+
+- `## Review` — multi-angle review loop expectation. Default: after local checks green, spawn parallel reviewer subagents (correctness + design/scope + pathway, plus security if relevant); iterate until reviewers converge with no Important findings (typically ~3 rounds); address each round's findings in a follow-up commit or fold-in; document round outcomes in the Report. Use the codebase's review skill if one exists (e.g. `/review`, `/security-review`). Without this, agents only run reviews when the target repo's conventions push them to — fragile.
+
 **Optional sections (include only when they earn their keep):**
 
 - `## Pointers` — bare list of paths, URLs, commands. **No prose paragraphs.** Trust the agent to read what's named.
