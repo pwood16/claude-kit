@@ -104,6 +104,7 @@ Notable recent changes from synced repos, transcripts, meetings.
 - **Preserve open questions** — don't remove them until they're answered (move to Key Decisions with the answer)
 - **Don't duplicate raw content** — summarize and link, don't copy-paste
 - **One domain per file** — if a file gets above ~300 lines, propose a split into two domains rather than letting it grow
+- **Pass the prose-style check** — after compiling or updating a domain file, re-read it against `../../references/prose-style.md` (relative to this skill's directory) and cut every tell it lists. Its whole-document negation count matters here: a compiled page accumulates the tell across many source summaries even when each sentence looks fine alone. Rewrite flagged sentences in place; the style pass keeps every cited fact
 
 ## When NOT to use
 

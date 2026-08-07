@@ -10,6 +10,10 @@ workspace and gives Claude two skills for keeping it useful:
 | `dispatch` | Hand off work to a background Claude in a tmux session. Worktree mode (default) at `~/dev/dispatched/<slug>/<repo>/`; own-folder mode at `~/dev/<TICKET>/<repo>/` for multi-week work. |
 | `curate` | Triage articles from configured sources + ad-hoc URLs into `brain/inbox.md`; flag items that contradict active work as `tasks/alert-*.md`. Source registry lives at `brain/sources.md`. |
 
+Prose written through these skills (brain pages, dispatched-agent reports, PR bodies)
+is held to a single writing-style file at `references/prose-style.md`. The `brain` and
+`dispatch` skills each point at that one file, so the rules stay in sync.
+
 ## Directory layout the skills expect
 
 ```
