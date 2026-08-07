@@ -167,6 +167,15 @@ Read the skeleton at `templates/prompt-skeleton.md` (relative to this skill's di
 - Reference files by path, not by explanation.
 - Target ≤ 80 lines, hard ceiling 150.
 
+**Prose deliverables:**
+
+The style rules above govern the dispatch prompt. When the *deliverable* includes prose a human will read (a report beyond a status line, a PR body, a design doc, a user-facing artifact), the doing agent also needs the writing-style constraint from `../../references/prose-style.md` (resolve to an absolute path from this skill's installed directory, same as the templates). Add two lines to the prompt:
+
+- Under `## Don't`: `No machine-writing tells in prose deliverables — draft to a file, re-read it against the prose-style path in Pointers and cut every tell it lists, then submit (e.g., \`gh pr create --body-file\`).`
+- Under `## Pointers`: the resolved absolute path to `prose-style.md`.
+
+A PR body counts as prose, so most dispatches that end in a PR get both lines. Skip them only when the dispatch produces code plus a status-line report and nothing else a human reads.
+
 ## Step 4 — Validate prompt
 
 Run each check. Block-level failures must be fixed before launch. Warn-level failures get surfaced for user confirm.
@@ -181,6 +190,7 @@ Run each check. Block-level failures must be fixed before launch. Warn-level fai
 | 6 | Prompt contains a step using `--force` (bare), `--hard`, `branch -D`, or pushing to the repo's default branch | **Block** unless replaced with `--force-with-lease` etc. |
 | 7 | Workspace path missing or not a git repo | **Block** |
 | 8 | `tmux has-session -t "<name>"` exits 0 (collision) | **Block**, suggest alternative |
+| 9 | Prompt contains an unresolved relative path (`../`) — e.g., a `## Pointers` entry copied literally instead of resolved to absolute | Warn |
 
 Concrete validation commands:
 
@@ -202,6 +212,10 @@ grep -nE '(^| )(--force[^-]|--hard|branch -D|push (origin )?(main|master))' "$pr
 # Check 8 — tmux name collision
 tmux has-session -t "$session_name" 2>/dev/null \
   && echo "BLOCK: tmux session '$session_name' already exists"
+
+# Check 9 — unresolved relative paths (the doing agent's cwd is the workspace, so these dangle)
+grep -n '\.\./' "$prompt_file" \
+  && echo "WARN: relative path in prompt — resolve to an absolute path"
 ```
 
 ## Step 5 — Name session
