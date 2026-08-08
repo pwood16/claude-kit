@@ -38,7 +38,7 @@ Two modes. **Worktree mode is the default** for most dispatch work. **Own-folder
 - Workspace path: `~/dev/dispatched/<sanitized>/<repo>/` — a git worktree off `~/dev/dispatched-head/<repo>/`.
 - `~/dev/dispatched-head/<repo>/` is the **canonical source clone**: always on the repo's default branch, always clean. Never commit work there. Only `git fetch` + worktree creation.
 - `~/dev/dispatched/<sanitized>/<repo>/` is the dispatch's working tree. Multiple repos sit as siblings (e.g., `~/dev/dispatched/<sanitized>/repo-a/` + `~/dev/dispatched/<sanitized>/repo-b/`).
-- After the dispatch wraps, the worktree is cleaned up with `git worktree remove` (the harvest skill handles this).
+- After the dispatch wraps, the worktree is cleaned up with `git worktree remove` — `/harvest` handles this.
 
 ### Own-folder mode (escape hatch)
 
@@ -319,4 +319,4 @@ Run `/hub init` to scaffold `~/dev/hub/`, `~/dev/dispatched-head/`, and `~/dev/d
 ## Reference
 
 - Adjacent skill: `spawn:wt-agent` (for new-branch worktree work, different use case)
-- Harvest sister skill: `/dispatch-close` (not yet built) — when it lands, will handle `git worktree remove` + `git worktree prune` for worktree-mode dispatches.
+- Harvest sister skill: `/harvest` — the closing half of this lifecycle. Records what the session actually shipped in its task file, then tears down the worktree, tmux session and leftover processes. **It is the only point `pr:` gets recorded**, so a dispatch that is never harvested leaves a PR-shaped hole in `~/dev/hub/tasks/`.

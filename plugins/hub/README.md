@@ -8,6 +8,7 @@ workspace and gives Claude two skills for keeping it useful:
 | `brain` | Compile `~/dev/hub/brain/<domain>.md` wiki files from everything under `~/dev/hub/` (raw notes, dated investigations, synced repo activity). One file per topic — regenerated via `/brain`, not hand-edited. |
 | `brain-health` | Diff the wiki against live sources (GitHub activity, file mtimes, anything you've configured) and report stale topics, missing topics, resolved questions. |
 | `dispatch` | Hand off work to a background Claude in a tmux session. Worktree mode (default) at `~/dev/dispatched/<slug>/<repo>/`; own-folder mode at `~/dev/<TICKET>/<repo>/` for multi-week work. |
+| `harvest` | Close out a finished dispatch: record what it actually shipped in its task file, then tear down the worktree, tmux session and leftover processes. The closing half of `dispatch`, and the only point `pr:` gets recorded. |
 | `curate` | Triage articles from configured sources + ad-hoc URLs into `brain/inbox.md`; flag items that contradict active work as `tasks/alert-*.md`. Source registry lives at `brain/sources.md`. |
 
 Prose written through these skills (brain pages, dispatched-agent reports, PR bodies)
