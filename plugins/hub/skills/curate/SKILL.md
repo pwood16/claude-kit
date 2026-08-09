@@ -419,7 +419,7 @@ Skeleton in `templates/inbox-skeleton.md`:
 ### <Title> — <source> (<tier>) — <YYYY-MM-DD>
 **Take:** <one sentence: what it says>
 **Why raised:** <one sentence: what pushed it past the filter — must name the active brain page, plan, or dispatch it connects to, or the novel angle it brings>
-<provenance lines — zero or more, one per line: `Via: …`, `Tier resolved: …`, `Re-tagged: …`, `Unresolved redirect`>
+<provenance lines — zero or more, one per line: `Published: …`, `Via: …`, `Tier resolved: …`, `Re-tagged: …`, `Unresolved redirect`>
 <link>
 
 ## Medium
@@ -434,8 +434,9 @@ Skeleton in `templates/inbox-skeleton.md`:
 Each non-Critical entry follows `templates/inbox-entry.md`. The **trailing** ` — <YYYY-MM-DD>` at the
 end of the `###` heading is the parse key for rollover — keep it, and make it **the date the item was
 raised, not the article's publication date.** Those differ, and using the publication date makes a
-run roll off entries it created minutes earlier. Put the publication date in the Take if it matters.
-For a cluster entry spanning several dates, the heading still carries the single raise date.
+run roll off entries it created minutes earlier. Record the publication date on a
+`Published: <date or range>` provenance line instead. For a cluster entry spanning several dates,
+the heading carries the single raise date and `Published:` carries the range.
 
 `{{source}}` is the **publisher**, not the newsletter — `{{tier}}` follows the publisher, and the
 newsletter is named on the `Via:` line instead. When an entry has no provenance lines, omit
