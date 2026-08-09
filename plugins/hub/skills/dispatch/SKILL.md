@@ -293,6 +293,40 @@ Reformat the subagent's summary into the user-facing report. No additions, no co
 
 If the subagent reports `status: failed`, surface its `notes` line and ask the user how to proceed — don't try to re-launch silently.
 
+## Sending a message into a running dispatch
+
+Scope changes, answers to a question the session asked, and "stop and check with me" all go in over tmux. **One `send-keys ... Enter` call is not enough while Claude is mid-turn.** The trailing `Enter` commits the text into the input box but never fires the submit, so the message sits at the `❯` prompt with no queue indicator and the dispatch never sees it.
+
+Always two calls:
+
+```bash
+tmux send-keys -t "<session>" "<text>" Enter   # 1. type the text
+tmux send-keys -t "<session>" Enter            # 2. submit / queue it
+```
+
+Then verify before telling the user it landed:
+
+```bash
+tmux capture-pane -t "<session>" -p | tail -15
+```
+
+| What the capture shows | Meaning |
+|---|---|
+| `Press up to edit queued messages` | Queued — picked up at the end of the current turn |
+| Empty input area | Submitted live; Claude was idle |
+| Text still sitting at `❯` | **NOT sent** — repeat call 2 |
+
+Never report "message sent" until one of the first two indicators is visible. A dispatch that runs on unaware of a scope change is the failure this check exists to prevent.
+
+**For long or formatting-sensitive messages, use the file-pointer pattern.** Write the detail to `/tmp/<slug>.md`, then send a short pointer instead of the body:
+
+```bash
+tmux send-keys -t "<session>" "read /tmp/<slug>.md and treat it as authoritative" Enter
+tmux send-keys -t "<session>" Enter
+```
+
+That dodges shell-escaping problems and keeps the queued prompt short.
+
 ## Workspace layout reference
 
 ```
