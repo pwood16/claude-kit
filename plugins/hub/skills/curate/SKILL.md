@@ -6,7 +6,7 @@ argument-hint: "[<url> | add <url> [tier] | remove <name-or-url>]"
 
 # Curate — Article Triage
 
-Triage articles from a registry of feeds + manual sources, raise standouts to Phil's inbox, and flag items that contradict active hub state as course-correction alerts. Sister to `/brain` (which synthesizes accumulated material into domain pages) — `/curate` handles the inflow.
+Triage articles from a registry of feeds + manual sources, raise standouts to the hub inbox, and flag items that contradict active hub state as course-correction alerts. Sister to `/brain` (which synthesizes accumulated material into domain pages) — `/curate` handles the inflow.
 
 ## Hub root resolution
 
@@ -88,11 +88,11 @@ These preconditions short-circuit the workflow before any file read or mutation.
 
 ## Memories the skill must respect
 
-Load each of these named memories before any triage decision — they encode Phil's calibration and rule the decision tree. They are **read-only references** — never edit them from this skill. Reference them by name, not by file path; the agent's own memory subsystem resolves them.
+Load each of these named memories before any triage decision — they encode the user's calibration and rule the decision tree. They are **read-only references** — never edit them from this skill. Reference them by name, not by file path; the agent's own memory subsystem resolves them.
 
 - `feedback-source-typing-taxonomy` — the four-bucket taxonomy (canonical / practitioner / synthesis / marketing) and how to weight claims by bucket. Source tier is not a free pass; canonical sources making out-of-domain claims drop to synthesis weight.
 - `user-ai-discourse-posture` — discount distant-skeptic "AI is hype" content; engage with concrete-pattern try-it-out content; weight practitioner-critics (Goedecke admitting UI testing fails) heavier than thinkpieces.
-- `user-agent-reality-calibration` — anchor synthesis in primary sources; flag novel-vs-echoing claims; do not pathologize Phil's reality-check instinct.
+- `user-agent-reality-calibration` — anchor synthesis in primary sources; flag novel-vs-echoing claims; do not pathologize the user's reality-check instinct.
 
 If any of these memories cannot be loaded, surface that fact in the final report rather than triaging blind.
 
@@ -266,6 +266,12 @@ usable summary exists.
 ### 4. Volume — fan out above the threshold
 
 Size the run from the thread count returned by `search_threads`, before fetching any bodies.
+
+**Do not trust `resultCountEstimate` for chunk boundaries.** Measured against a live mailbox it is
+exact for small result sets (reported 4, returned 4) but inflates badly at scale — it reported 201
+for a window whose true count was around 110. Use it only for the coarse inline-vs-fan-out decision,
+where a 2× overshoot cannot change the answer. Once it clears the threshold, **paginate the thread
+list and count the pages** to get a real number before choosing boundaries.
 
 Note the cost this accepts: the parent fetches every body to archive, and each subagent fetches its
 range again to triage. Issues in a fanned-out range are fetched twice. That is the price of keeping
@@ -500,14 +506,14 @@ Kebab-case from the article title, max 6 words, lowercase, drop non-alphanumeric
 ### Lifecycle
 
 - `status: open` → surfaces in the Critical inbox section on every run.
-- Phil edits the frontmatter to `applied` or `dismissed` to close.
+- The user edits the frontmatter to `applied` or `dismissed` to close.
 - Closed alerts stay in `tasks/` as historical record — same pattern as harvested `spawn-*.md`. The next `/curate` run reads `status` and only surfaces `open`.
 
 ### Hard limits
 
-- **No auto-pause of affected dispatches.** Alerts flag; Phil decides. Never write to or stop any `spawn-*.md`.
+- **No auto-pause of affected dispatches.** Alerts flag; the user decides. Never write to or stop any `spawn-*.md`.
 - **No push notifications.** Out of scope.
-- **No new dispatches generated from alerts.** Phil decides whether to launch.
+- **No new dispatches generated from alerts.** The user decides whether to launch.
 
 ## Full-run workflow
 
@@ -598,7 +604,7 @@ If a single skip-reason exceeds 50% of total skips on this run, append a one-lin
 
 - **Never delete brain pages, plans, decisions, or alerts.** Update or mark superseded; never destructive. Closed alerts stay in `tasks/`.
 - **Cite the source.** Every inbox entry links to the original URL. Every alert names the affected file path(s) in `affects:`.
-- **Tag with bucket inline** in inbox entries (`(practitioner)`, `(canonical)`, etc.) — the visible tag is Phil's calibration handle (per `feedback-source-typing-taxonomy`).
+- **Tag with bucket inline** in inbox entries (`(practitioner)`, `(canonical)`, etc.) — the visible tag is the user's calibration handle (per `feedback-source-typing-taxonomy`).
 - **Why-raised discipline.** No entry ships with a vague rationale. If you can't connect it to active work or name a novel angle, log it as `echo` or `too-thin` instead.
 - **No archive layer for inbox.** 14-day rollover is the only retention rule. Raw sources are the permanent record.
 - **No scheduled fetching.** `/curate` runs on demand only.
@@ -617,7 +623,7 @@ If a single skip-reason exceeds 50% of total skips on this run, append a one-lin
 | Triage a brain domain page | Brain pages are already synthesized; `/curate` is for raw new arrivals |
 | Read one web page for its content | Use `WebFetch` directly — `/curate` is for triage with a written outcome, not lookup |
 | Read, search or summarize email | Use the Gmail tools directly — `/curate` touches mail only to archive and triage a registered `gmail` source |
-| Stop or modify an active dispatch | Alerts flag only; Phil decides. Edit `tasks/spawn-*.md` by hand if intervention is needed |
+| Stop or modify an active dispatch | Alerts flag only; the user decides. Edit `tasks/spawn-*.md` by hand if intervention is needed |
 
 ## Reference
 

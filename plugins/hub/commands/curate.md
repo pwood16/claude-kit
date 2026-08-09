@@ -14,4 +14,4 @@ Argument routing — apply precedence in this exact order:
 
 See the skill's `Argument parsing notes` and `Required-token preconditions` sections for the exact handling of edge cases (missing URL after `add`, extra tokens, bad tier, etc.). Do not guess — refuse and print usage.
 
-Follow the skill's workflow exactly. Load the three named memories the skill references (`feedback-source-typing-taxonomy`, `user-ai-discourse-posture`, `user-agent-reality-calibration`) before triaging any item — they encode Phil's calibration.
+Follow the skill's workflow exactly. Load the three named memories the skill references (`feedback-source-typing-taxonomy`, `user-ai-discourse-posture`, `user-agent-reality-calibration`) before triaging any item — they encode the user's calibration.
