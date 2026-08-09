@@ -18,7 +18,7 @@ The files this skill touches:
 |---|---|
 | `brain/sources.md` | Source registry — hand-editable; mutated by `add`/`remove` |
 | `brain/inbox.md` | Curated digest — rewritten on full runs, prepended on single-URL runs |
-| `brain/raw/<source-slug>/` | Per-source raw archive. **Read-only for `manual` sources** (you drop files there yourself). **Written by this skill for `gmail` sources.** **Slug rule:** lowercase; spaces → `-`; drop everything except `[a-z0-9-]`; collapse runs of `-`; trim leading/trailing `-` (e.g., `TLDR (paste)` → `tldr-paste`) |
+| `brain/raw/<source-slug>/` | Per-source raw archive. **Read-only for `manual` sources** (you drop files there yourself). **Written by this skill for `gmail` sources.** **Slug rule:** lowercase; spaces → `-`; drop everything except `[a-z0-9-]`; collapse runs of `-`; trim leading/trailing `-` (e.g., `Acme Weekly (paste)` → `acme-weekly-paste`). **Name a source so its slug matches the directory it should write to** — a `gmail` row for TLDR must be named `TLDR` so it slugs to `tldr` and finds the existing archive; `TLDR (paste)` would slug to `tldr-paste` and re-archive the whole corpus into an empty parallel tree |
 | `brain/raw/curate-skipped.log` | Append-only filter-out log for tuning |
 | `tasks/alert-<slug>.md` | One file per active course-correction alert |
 
@@ -69,7 +69,7 @@ Usage:
   /curate remove <name-or-url>     remove a source
 ```
 
-The `add` usage line and the `remove` usage line referenced below are the third and fourth lines of that block.
+The `add` usage line and the `remove` usage line referenced below are the `/curate add` and `/curate remove` lines of that block.
 
 ### Argument parsing notes
 
@@ -139,10 +139,15 @@ Columns:
 Newsletters arrive by email, so no feed URL exists to poll. A `gmail` source names a Gmail query
 instead, and the skill fetches, archives, and triages in one pass.
 
-**A `gmail` run produces three outputs, in this order:** raw issues archived to
-`brain/raw/<source-slug>/`, inbox entries for the **articles the issues link to**, and registry-add
-proposals for recurring publishers. All three are required — an archive-only run has not curated, and
-a triage-only run destroys the permanent record `/brain` compiles from.
+**A `gmail` run produces three outputs:** raw issues archived to `brain/raw/<source-slug>/`, inbox
+entries for the **articles the issues link to**, and registry-add proposals for recurring publishers.
+All three are required — an archive-only run has not curated, and a triage-only run destroys the
+permanent record `/brain` compiles from.
+
+**The load-bearing invariant: a file present in `brain/raw/<source-slug>/` means that issue has
+already been triaged.** Archive an issue only after its triage completes. That is what makes dedup a
+safe triage predicate — skipping already-archived issues can never skip an untriaged one. Archiving
+first would break it: a range whose triage died would sit on disk looking done forever.
 
 **Gmail is read-only.** Use `search_threads` and `get_thread` and nothing else. Never label, draft,
 archive, delete, or otherwise mutate mail state — mail is shared state outside the hub root, and the
@@ -169,11 +174,12 @@ back as the **`pageToken` request parameter**, until no token is returned. A ful
 of results.
 
 **Two counting hazards before you size the run.** `search_threads` returns *threads*, not messages,
-and Gmail matches a whole thread when any one message matches — so count **messages inside the
-returned threads that actually fall in range**, not threads. And Gmail's date operators resolve in
-the account's timezone while the cursor is UTC, so the boundary day both re-fetches and can miss;
-dedup (below) covers the re-fetch, and the `newer_than:30d` floor plus a one-day overlap on fan-out
-boundaries covers the miss.
+and Gmail matches a whole thread when any one message matches. Per-message dates need `get_thread`,
+so use the **thread count as the sizing proxy** for the fan-out decision — it is close enough for a
+threshold and needs no extra reads. Reconcile to a true message count once bodies are fetched, and
+report that number. And Gmail's date operators resolve in the account's timezone while the cursor is
+UTC, so the boundary day both re-fetches and can miss; dedup covers the re-fetch, and the
+`newer_than:30d` floor plus a one-day overlap on fan-out boundaries covers the miss.
 
 Read bodies with `get_thread` at `messageFormat: FULL_CONTENT`.
 
@@ -183,8 +189,10 @@ Read bodies with `get_thread` at `messageFormat: FULL_CONTENT`.
 directory holds files, read one and follow its filename shape and frontmatter keys exactly. The
 rules below describe the existing hub convention and are the default when the directory is empty.
 
-Refuse and report the source `failed` if `brain/raw/<source-slug>/` is a **symlink** — the skill
-never writes outside the hub root, and a symlink silently escapes it.
+**Resolve the realpath of the write target and assert it is under the hub root** before writing;
+refuse and report the source `failed` otherwise. Testing only whether `brain/raw/<source-slug>/` is a
+symlink is not enough — `brain/raw/` itself is documented as a place symlinks to other repos live, so
+a symlinked parent passes that test and the write still escapes the hub root.
 
 **Filename:** `YYYY-MM-DD-<newsletter-slug>.md`, where `YYYY-MM-DD` is the received date **in UTC**
 and `<newsletter-slug>` identifies the publication (see below). Append `-<HHMM>` (UTC) only when that
@@ -213,10 +221,15 @@ loss.
 | `gmail_thread_id` | thread `id` from `search_threads` |
 | `gmail_message_id` | message `id` from `get_thread` — the Gmail API id, **not** the RFC822 `Message-ID` header, which these tools do not return |
 
-**Dedup on `gmail_message_id`** against the files already in the directory, before writing. Never
-archive a message twice, and **triage only the issues newly archived this run** — re-triaging a
-boundary-day issue every run inflates `curate-skipped.log` and corrupts the 50%-of-skips calibration
-hint that reads from it.
+**Dedup on `gmail_message_id`** against the files already in the directory. Skip any message already
+archived — by the invariant above, it has been triaged, so skipping it is safe. Re-triaging every
+boundary-day issue would inflate `curate-skipped.log` and corrupt the 50%-of-skips calibration hint
+that reads from it.
+
+Write the file only after that issue's links have been triaged and its findings are in hand. On a
+fanned-out run that means the parent archives a range's issues when that range's subagent returns
+successfully, and **archives nothing for a range that failed** — leaving those issues absent so the
+next run re-fetches, re-triages and archives them.
 
 Raw files are never deleted and never roll off. Only inbox entries expire.
 
@@ -252,22 +265,39 @@ usable summary exists.
 
 ### 4. Volume — fan out above the threshold
 
-Count in-range messages before reading any of them.
+Size the run from the thread count returned by `search_threads`, before fetching any bodies.
+
+Note the cost this accepts: the parent fetches every body to archive, and each subagent fetches its
+range again to triage. Issues in a fanned-out range are fetched twice. That is the price of keeping
+the archive lossless while isolating triage context, and it is deliberate.
 
 | Messages past cursor | Approach |
 |---|---|
 | ≤ 40 | Triage inline. |
 | 41–160 | **Split across parallel subagents** — chunks of ~40, 4 agents maximum. |
-| > 160 | Process the oldest 160 as above, advance the cursor to the end of what completed, and report the remainder as still pending. Do not silently truncate. |
+| > 160 | Process the oldest 160 as above, advance the cursor to the end of what completed, and report the remainder as still pending. Do not silently truncate — the remainder is untriaged and unarchived, so the next run picks it up. |
 
 Split by **half-open date range** — `[start, end)` — so adjacent chunks cannot both claim the
 boundary day. Density is uneven across dates, so derive boundaries from the message counts you
 already have rather than dividing the calendar evenly.
 
-Each subagent receives: its half-open date range; the Gmail query; the **full text** of the three
-calibration memories (subagents do not inherit the parent's memory, so paste content, not names); a
-hub-state summary sufficient to judge relevance; the tier table above; and an instruction to return
-structured findings and write nothing.
+**Each subagent receives all of:** its half-open date range; the Gmail query; the **full text** of the
+three calibration memories (subagents do not inherit the parent's memory, so paste content, not
+names); a hub-state summary sufficient to judge relevance; the tier table above; the decision tree
+and its bucket definitions; the "contradicts active work" definition; the five filter-out reason
+tags; the Why-raised discipline; and an instruction to write nothing. An underspecified brief is why
+two agents bucket the same article differently.
+
+**Return schema** — subagents return both halves, because the parent cannot reconstruct either:
+
+```
+{ raises: [ { title, publisher, url, tier, bucket, take, why_raised, via, contradicts? } ],
+  skips:  [ { url, publisher, tier, reason_tag } ],
+  covered: { start, end, messages_read } }
+```
+
+Without `skips[]` a fanned-out run writes no skip lines at all, which silently breaks the
+50%-dominance calibration hint. The parent writes those lines from the returned array.
 
 **Division of labour is fixed:** subagents return triage findings only — never issue bodies. **The
 parent does its own archive pass and writes every file.** Routing the archive through a summarizing
@@ -302,7 +332,7 @@ gmail source.
 | Situation | Do this |
 |---|---|
 | Gmail tools unavailable at start | Report the source `failed`, keep its cursor, continue with other sources. |
-| Gmail auth fails mid-run | Keep every issue already archived (dedup makes re-running safe). Write inbox entries only for fully triaged issues. Advance the cursor to the last fully triaged message, report `partial`, name the uncovered range. |
+| Gmail auth fails mid-run | Archive only issues whose triage finished; leave the rest unarchived. Advance the cursor to the last fully triaged message, report `partial`, name the uncovered range. |
 | A subagent errors, times out, or returns nothing | Cursor advances only to the end of the contiguous successful prefix; report `partial` with the uncovered ranges. Never treat an empty return as "nothing to raise". |
 | `plaintext_body` empty | Fall back to markdown-converted `html_body` and set `body_source: html`. Never archive an empty body. |
 | Neither body form usable | Skip the archive for that issue, report it by subject and date, and do not advance the cursor past it. |
@@ -353,6 +383,11 @@ Items the filter drops (silent skip, not raised). Each appends one tab-separated
 <ISO timestamp>	<source>	<tier>	<url>	<reason-tag>
 ```
 
+For an article linked from a `gmail` source, `<source>` is `<publisher-host> (via <newsletter-slug>)`
+and `<tier>` is the item's resolved tier, not the registry row's. Stamping every newsletter skip with
+the row's name and `synthesis` would erase the publisher, which is the only thing that makes the log
+useful for tuning.
+
 Reason tags (use exactly one):
 - `mid-tier-marketing` — marketing tier from non-foundational vendor.
 - `canonical-non-substantive` — marketing from a canonical-tier lab that's neither an artifact change (row 3) nor a direction signal (row 5) — e.g., hiring, culture, event recaps.
@@ -364,7 +399,9 @@ The log is the calibration handle — if one reason starts dominating, the filte
 
 ## Inbox output — `brain/inbox.md`
 
-Single living file. Items grouped by bucket, sorted by recency (newest first) within bucket. Items roll off after 14 days from `raised_at`.
+Single living file. Items grouped by bucket, sorted by recency (newest first) within bucket.
+**Non-Critical items roll off 14 days after their raise date. Critical lines never roll off — the
+Critical section is regenerated from open `tasks/alert-*.md` on every run.**
 
 Skeleton in `templates/inbox-skeleton.md`:
 
@@ -394,10 +431,15 @@ Skeleton in `templates/inbox-skeleton.md`:
 (entries as in High)
 ```
 
-Each non-Critical entry follows `templates/inbox-entry.md`. The leading `YYYY-MM-DD` in each heading is the parse key for 14-day rollover — keep it.
+Each non-Critical entry follows `templates/inbox-entry.md`. The **trailing** ` — <YYYY-MM-DD>` at the
+end of the `###` heading is the parse key for rollover — keep it, and make it **the date the item was
+raised, not the article's publication date.** Those differ, and using the publication date makes a
+run roll off entries it created minutes earlier. Put the publication date in the Take if it matters.
+For a cluster entry spanning several dates, the heading still carries the single raise date.
 
 `{{source}}` is the **publisher**, not the newsletter — `{{tier}}` follows the publisher, and the
-newsletter is named on the `Via:` line instead.
+newsletter is named on the `Via:` line instead. When an entry has no provenance lines, omit
+`{{provenance_lines}}` entirely rather than emitting a blank line.
 
 **The "Why raised" field is the calibration handle.** It must name the active brain page, plan, or dispatch the entry connects to, or the novel angle it brings. "Looked interesting" or "good writeup" is not acceptable — if you can't connect it, log it as `echo` or `too-thin` instead.
 
@@ -410,7 +452,7 @@ On a full run:
    - Non-Critical entries: trailing ` — <YYYY-MM-DD>` at the end of the `###` heading.
 3. Drop entries dated more than 14 days before "now". **Critical lines are exempt while their alert is still `open`** — regenerate the Critical section from `tasks/alert-*.md` (one line per `open` alert, newest first) rather than rolling it over. A closed alert's line drops on the next run.
    **Preserve by hand-merge, do not blank-slate:** the file's header block and any italic annotations on surviving entries (`*(updated with corroboration)*`, `*Verified this run: …*`) carry human edits. Rewrite means re-emit with new entries merged in, never regenerate from the empty skeleton.
-4. Merge with new entries from this run (deduplicate by URL — newer entry wins on rebucketing).
+4. Merge with new entries from this run (deduplicate by URL — the newer entry wins on bucket and Take, but **carry forward any italic annotations from the older one**; those are human edits, and "newer wins" would otherwise delete what step 3 just promised to preserve).
 5. Sort within bucket by date desc; rewrite the file.
 
 Raw files in `brain/raw/` remain the permanent record — entries roll off the inbox, not the source.
@@ -494,21 +536,21 @@ digraph full_run {
 4. **Fetch each source** newer than its `Last fetched` cursor (treat `—` as "no cursor — fetch everything"):
    - `rss` — `WebFetch` the feed URL, parse items, fetch each item's link for content. (rss items are not archived; the cursor alone bounds them.)
    - `manual` — `ls` files under `brain/raw/<source-slug>/` with mtime > cursor. Slug rule defined in the "files this skill touches" table above.
-   - `gmail` — see "Gmail sources" above: fetch past the cursor, archive each issue to `brain/raw/<source-slug>/`, then triage the **articles the issues link to**. Fan out to subagents above 20 issues.
+   - `gmail` — see "Gmail sources" above: fetch past the cursor, triage the **articles the issues link to**, and archive each issue to `brain/raw/<source-slug>/`. Fan out per "Volume" in that section.
 5. **Triage** each item against the decision tree above. Apply per-item overrides as needed.
-5b. **Archive** (gmail sources only) — write each newly fetched issue to `brain/raw/<source-slug>/` before triaging it, per "Gmail sources → Archive". The parent writes these even when triage was fanned out.
-6. **Write/reuse alerts** for Critical items. One file under `tasks/alert-<slug>.md` per active alert; reuse existing `open` alerts with the same `source_url`.
-7. **Build inbox entries** for non-skipped items. Each Critical item also gets a one-line pointer in the Critical section of `inbox.md`.
-8. **Compose `inbox.md`** — merge new entries with the surviving 14-day window, sort within bucket, rewrite.
-8b. **Propose registry adds** (gmail runs only) — publishers with 2+ raises this run and no existing row, per "Gmail sources → Propose registry additions". Emit in the report; never write the row.
-9. **Update cursors** in `sources.md` — set `Last fetched` to this run's start ISO timestamp for every source that was polled cleanly (including those that yielded zero new items). A source that failed to fetch keeps its previous cursor and is reported as `failed` in the summary.
-10. **Report** — see Reporting below.
+6. **Archive** (gmail sources only) — once a range's triage has returned, write its issues to `brain/raw/<source-slug>/` per "Gmail sources → Archive". The parent writes these even when triage was fanned out, and writes nothing for a range that failed.
+7. **Write/reuse alerts** for Critical items. One file under `tasks/alert-<slug>.md` per active alert; reuse existing `open` alerts with the same `source_url`.
+8. **Build inbox entries** for non-skipped items. Each Critical item also gets a one-line pointer in the Critical section of `inbox.md`.
+9. **Compose `inbox.md`** — merge new entries with the surviving 14-day window, sort within bucket, rewrite.
+10. **Propose registry adds** (gmail runs only) — publishers with 2+ raises this run and no existing row, per "Gmail sources → Propose registry additions". Emit in the report; never write the row.
+11. **Update cursors** in `sources.md` — set `Last fetched` to this run's start ISO timestamp for every source that was polled cleanly (including those that yielded zero new items). A source that failed to fetch keeps its previous cursor and is reported as `failed`; a source that lost a subagent advances only to the end of its contiguous successful prefix and is reported as `partial`.
+12. **Report** — see Reporting below.
 
 ## Single-URL workflow
 
 `/curate <url>`:
 
-1. **Resolve tier** by the rule in Triage logic → Inputs: an exact `URL`-cell match in `sources.md` uses that row's `Tier`; otherwise resolve from the publisher via `feedback-source-typing-taxonomy` and record `Tier resolved: …`. Do not default to `synthesis` without checking the publisher. Ignore `gmail` rows when host-matching — their `URL` cell is a Gmail query containing a host-shaped substring that will false-match.
+1. **Resolve tier** by the rule in Triage logic → Inputs. Match on **host**: if the URL's host equals the host of an `rss` row's `URL` cell, use that row's `Tier`. Otherwise resolve from the publisher via `feedback-source-typing-taxonomy` and record `Tier resolved: …`. Never default to `synthesis` without checking the publisher — most ad-hoc URLs are articles, not feed URLs, so they will not match any row and the publisher rule is what actually decides. Skip `gmail` rows entirely when host-matching; their `URL` cell is a Gmail query containing a host-shaped substring that would false-match.
 2. **Fetch** the URL with `WebFetch`.
 3. **Load hub state + memories** (same as full run).
 4. **Triage** against the same decision tree.
