@@ -153,7 +153,14 @@ Read the skeleton at `templates/prompt-skeleton.md` (relative to this skill's di
 
 - `## Task` — 1-3 sentences. What and why.
 - `## Don't` — each line: prohibition + concrete alternative. E.g., `No force push — use \`--force-with-lease\``.
-- `## Report` — 1-2 sentences on what to communicate back.
+- `## Report` — 1-2 sentences on what to communicate back, **plus the two required bullets below**.
+
+**The Report contract (both bullets, verbatim, in every dispatch):**
+
+- **What this lands** — one plain-language paragraph on what changes for someone using the product. A file-by-file changelog does not satisfy it.
+- **Screenshots** — if the change alters rendered output, attach to the PR via `gh` before reporting; answer `no rendered-output change` when it does not apply. Never commit image files.
+
+Keep the screenshot bullet on backend-only work. Its "no rendered-output change" branch is the answer, and deleting the bullet is what makes the question get skipped. Both bullets exist because they were the two most-repeated things the reader had to ask for across 65 dispatches — 25 screenshot requests and 11 "what did this actually land" requests, on top of a further 21 asks about whether review had run.
 
 **Optional sections (include only when they earn their keep):**
 
@@ -167,9 +174,9 @@ Read the skeleton at `templates/prompt-skeleton.md` (relative to this skill's di
 - Reference files by path, not by explanation.
 - Target ≤ 80 lines, hard ceiling 150.
 
-**Prose deliverables:**
+**Prose deliverables (default on):**
 
-The style rules above govern the dispatch prompt. When the *deliverable* includes prose a human will read (a report beyond a status line, a PR body, a design doc, a user-facing artifact), the doing agent also needs the writing-style constraint from `../../references/prose-style.md` (resolve to an absolute path from this skill's installed directory, same as the templates). Add two lines to the prompt:
+The style rules above govern the dispatch prompt. The *deliverable* needs its own constraint whenever it includes prose a human will read — a report beyond a status line, a PR body, a design doc, a user-facing artifact. **Treat this as on by default and justify leaving it out**, rather than remembering to add it: eight separate rounds of "you're being too verbose" and "make this way less verbose so I can get the executive summary" across the dispatch corpus are what a conditional reminder bought. Both lines come from `../../references/prose-style.md` (resolve to an absolute path from this skill's installed directory, same as the templates):
 
 - Under `## Don't`: `No machine-writing tells in prose deliverables — draft to a file, re-read it against the prose-style path in Pointers and cut every tell it lists, then submit (e.g., \`gh pr create --body-file\`).`
 - Under `## Pointers`: the resolved absolute path to `prose-style.md`.
@@ -191,10 +198,21 @@ Run each check. Block-level failures must be fixed before launch. Warn-level fai
 | 7 | Workspace path missing or not a git repo | **Block** |
 | 8 | `tmux has-session -t "<name>"` exits 0 (collision) | **Block**, suggest alternative |
 | 9 | Prompt contains an unresolved relative path (`../`) — e.g., a `## Pointers` entry copied literally instead of resolved to absolute | Warn |
+| 10 | `## Report` missing a **What this lands** bullet | **Block** |
+| 11 | `## Report` missing a **Screenshots** bullet (required even on backend-only work — the answer is `no rendered-output change`) | **Block** |
+| 12 | Deliverable includes prose a human reads, and the prompt has no `prose-style.md` path in `## Pointers` | **Block** unless the dispatch produces only code plus a one-line status |
 
 Concrete validation commands:
 
 ```bash
+# Checks 10/11/12 — report contract + prose style
+grep -qi 'what this lands' "$prompt_file" \
+  || echo "BLOCK: ## Report is missing the 'What this lands' bullet"
+grep -qi 'screenshot' "$prompt_file" \
+  || echo "BLOCK: ## Report is missing the Screenshots bullet (backend-only still answers 'no rendered-output change')"
+grep -q 'prose-style.md' "$prompt_file" \
+  || echo "BLOCK unless code+status-line only: no prose-style.md path in ## Pointers"
+
 # Check 2/3 — line count
 lines=$(wc -l < "$prompt_file")
 if (( lines > 150 )); then echo "BLOCK: prompt is $lines lines (max 150)"; fi
