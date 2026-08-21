@@ -1,8 +1,8 @@
 # gh-stack evals
 
 Use these to verify the skill activates correctly and drives `gh stack` non-interactively.
-Re-run on every model upgrade, skill edit, or gh-stack extension update (public preview —
-the surface can move).
+Re-run on every model upgrade, skill edit, or gh-stack extension update; the extension is
+in public preview and its surface can move.
 
 ## Should activate
 

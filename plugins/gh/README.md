@@ -39,12 +39,13 @@ merges interact with branch protection and merge queues.
 
 **Provenance:** vendored from the official skill at
 [`github/gh-stack/skills/gh-stack`](https://github.com/github/gh-stack/tree/main/skills/gh-stack),
-commit `ab00aa4a3f2d` (extension v0.1.0), MIT licence (see `skills/gh-stack/LICENSE`). Local
+commit `ab00aa4a3f2d` (extension v0.1.0), MIT license (see `skills/gh-stack/LICENSE`). Local
 modifications: the frontmatter description reworded to "Use when…" framing plus provenance keys,
-a "When to stack" section, one sentence on branch protection under "Merging", and a new
-`references/evals.md`. Everything else is upstream verbatim.
+a "When to stack" section, one sentence on branch protection under "Merging", a corrected
+`add -A`/`-u` note in `references/commands.md` (the CLI opens an editor rather than requiring
+`-m`), and a new `references/evals.md`. Everything else is upstream verbatim.
 
-Stacked PRs are in **public preview** — the command surface can change. To refresh the vendored
+Stacked PRs are in **public preview**, so the command surface can change. To refresh the vendored
 copy, diff against upstream `skills/gh-stack/` and re-apply the local modifications listed above.
 
 **Requirements:** `gh extension install github/gh-stack`, and stacked PRs enabled on the target
