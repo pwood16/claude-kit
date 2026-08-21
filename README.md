@@ -21,6 +21,7 @@ GitHub branch and PR workflow automation commands.
 
 - `/gh:load-pr [branch-or-pr-number]` - Fetch, checkout, and load PR context for review
 - `/gh:pr-draft` - Smart commit, push, and create draft PR with AI-generated description
+- `gh-stack` skill - Drive GitHub stacked PRs via the `gh stack` extension (vendored from the official MIT-licensed skill in `github/gh-stack`)
 
 See [plugins/gh](plugins/gh) for details.
 

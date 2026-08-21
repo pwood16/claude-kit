@@ -14,7 +14,7 @@
     {
       "name": "gh",
       "source": "./plugins/gh",
-      "description": "GitHub workflow commands for branch management and PR review"
+      "description": "GitHub workflow commands for branch management, PR review, and stacked PRs"
     },
     {
       "name": "excalidraw",
